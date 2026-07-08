@@ -3,6 +3,7 @@
 <img src="extension/icons/icon-128.png" align="right" width="88" height="88" alt="Chrome Bookmarks MCP icon">
 
 [![CI](https://github.com/JoshuaRamirez/chrome-bookmarks-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/JoshuaRamirez/chrome-bookmarks-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/JoshuaRamirez/chrome-bookmarks-mcp?sort=semver)](https://github.com/JoshuaRamirez/chrome-bookmarks-mcp/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
 
 Manage Chrome's **synced** bookmarks from Claude Code — list, search, add, move,

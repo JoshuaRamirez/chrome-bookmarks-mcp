@@ -188,9 +188,12 @@ async function opImport() {
   if (!file) return;
   let data;
   try { data = JSON.parse(await file.text()); }
-  catch (e) { alert("Invalid JSON: " + e.message); return; }
+  catch (e) {
+    await showModal("Import failed", el("div", { class: "empty", text: "Invalid JSON: " + e.message }), [{ label: "Close", value: null }]);
+    return;
+  }
   const n = await BookmarkStore.importInto(sel.value, data);
-  alert(`Imported ${n} item(s).`);
+  await showModal("Import complete", el("div", { class: "empty", text: `Imported ${n} item(s).` }), [{ label: "Close", value: null }]);
   render();
 }
 
@@ -272,6 +275,16 @@ async function render() {
   await updateStats();
   if (q) await renderSearch(q); else await renderTree();
 }
+
+// ---- error safety net ------------------------------------------------------
+// Operations go straight through BookmarkStore; if chrome.bookmarks rejects
+// (e.g. moving a folder into its own descendant, or a remove constraint), the
+// op would otherwise fail silently. Surface any unhandled rejection so the user
+// sees what went wrong instead of a no-op.
+window.addEventListener("unhandledrejection", (e) => {
+  const msg = (e.reason && e.reason.message) || String(e.reason || "Unknown error");
+  showModal("Something went wrong", el("div", { class: "empty", text: msg }), [{ label: "Close", value: null }]);
+});
 
 // ---- wire up ---------------------------------------------------------------
 document.getElementById("newFolder").addEventListener("click", () => opNewFolder());

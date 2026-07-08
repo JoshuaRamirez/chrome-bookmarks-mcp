@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.1]
+
+### Fixed
+- Manager UI: operations (`rename`, `move`, `delete`, folder/bookmark creation)
+  no longer fail silently. A global rejection handler surfaces any
+  `chrome.bookmarks` error (e.g. moving a folder into its own descendant) in a
+  modal instead of a no-op.
+
+### Changed
+- Manager UI: replaced the two remaining `alert()` calls (import result/errors)
+  with the same modal used elsewhere — consistent, non-blocking messaging.
+
 ## [1.1.0]
 
 ### Added

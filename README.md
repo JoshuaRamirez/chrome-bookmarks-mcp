@@ -59,7 +59,7 @@ Once the extension is loaded and Chrome is running, ask Claude to run
 | `bookmarks_status` | Is the extension bridge connected? |
 | `stats` | Count of folders and URLs |
 | `list_folders` | Every folder with id, depth, and full path |
-| `list_bookmarks` | Bookmarks, optionally within a folder |
+| `list_bookmarks` | Full nested bookmark tree |
 | `search_bookmarks` | Live filter across all bookmarks |
 | `add_bookmark` | Create a bookmark, targeting any folder or path |
 | `create_folder` | Create a folder under any parent or path |
@@ -72,6 +72,9 @@ Once the extension is loaded and Chrome is running, ask Claude to run
 | `remove_empty_folders` | Prune folders with no descendants (supports `dry_run`) |
 | `apply_moves` | Batch-move bookmarks from a plan TSV (supports `dry_run`) |
 | `export_json` | Export the whole tree as portable JSON |
+
+See **[examples/USAGE.md](examples/USAGE.md)** for a step-by-step walkthrough —
+first-run check, adding to a folder, safe deduplication, and batch reorganization.
 
 Destructive tools (`remove_*`, `apply_moves`) accept a `dry_run` flag; export
 first for a backup.

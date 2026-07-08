@@ -9,6 +9,12 @@ All notable changes to this project are documented here. Format loosely follows
 - Extension icons (16/48/128) — a bookmark-ribbon glyph, so the toolbar button
   and `chrome://extensions` entry show real branding instead of the default
   puzzle piece. Source SVG committed at `extension/icons/icon.svg`.
+- `examples/USAGE.md` — a step-by-step walkthrough (first-run check, folder-
+  targeted add, safe dedupe, batch reorganization), linked from the README.
+
+### Fixed
+- README described `list_bookmarks` as folder-scoped; corrected to "full nested
+  bookmark tree" to match the actual tool.
 
 ## [1.0.2]
 

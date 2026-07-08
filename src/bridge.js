@@ -50,7 +50,7 @@ export class Bridge {
   call(method, params = {}, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
       if (!this.connected()) {
-        reject(new Error("Chrome bridge not connected — open Chrome with the Bookmark Manager extension loaded."));
+        reject(new Error("Chrome bridge not connected — run the bookmarks_status tool for setup steps. (Chrome must be open with the companion Bookmark Manager extension loaded via chrome://extensions → Load unpacked.)"));
         return;
       }
       const id = this.seq++;

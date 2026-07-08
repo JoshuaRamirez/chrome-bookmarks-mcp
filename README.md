@@ -85,6 +85,21 @@ first for a backup.
 
 If you change the port, update the extension's `bridge.js` to match.
 
+## Troubleshooting
+
+Run **`bookmarks_status`** first — when the bridge is disconnected it returns the
+exact steps to fix it. Common cases:
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Tools error with *"Chrome bridge not connected"* | Extension not loaded, or Chrome is closed | Open Chrome; load the extension unpacked (see step 2 above) |
+| Was working, now times out | Chrome was quit, or the MV3 service worker went idle | Re-open Chrome / click the toolbar icon once to wake the worker; the extension re-dials automatically within a few seconds |
+| Still disconnected after loading | Port mismatch | The extension dials `ws://127.0.0.1:8765`; if you set `BOOKMARK_BRIDGE_PORT`, edit `BRIDGE_URL` in `extension/bridge.js` to match |
+| `apply_moves` can't find its plan | No plan file at the default path | Pass `file_path`, or set `BOOKMARK_PLAN_FILE` |
+
+The extension auto-reconnects (3s retry) if the MCP server restarts, so you rarely
+need to reload it — just make sure Chrome is running.
+
 ## Build from source
 
 ```

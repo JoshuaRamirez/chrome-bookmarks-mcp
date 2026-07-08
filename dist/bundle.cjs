@@ -24849,7 +24849,7 @@ var Bridge = class {
   call(method, params = {}, timeoutMs = 15e3) {
     return new Promise((resolve, reject) => {
       if (!this.connected()) {
-        reject(new Error("Chrome bridge not connected \u2014 open Chrome with the Bookmark Manager extension loaded."));
+        reject(new Error("Chrome bridge not connected \u2014 run the bookmarks_status tool for setup steps. (Chrome must be open with the companion Bookmark Manager extension loaded via chrome://extensions \u2192 Load unpacked.)"));
         return;
       }
       const id = this.seq++;
@@ -24874,7 +24874,7 @@ var PLAN_DEFAULT = process.env.BOOKMARK_PLAN_FILE || (0, import_node_path.join)(
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.0" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.1" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24886,9 +24886,25 @@ async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
 }
 server.tool(
   "bookmarks_status",
-  "Report whether the Chrome extension bridge is connected and on what port.",
+  "Report whether the Chrome extension bridge is connected and on what port. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
   {},
-  async () => ok({ connected: bridge.connected(), port: PORT })
+  async () => {
+    if (bridge.connected()) {
+      return ok({ connected: true, port: PORT, message: "Extension bridge connected \u2014 all bookmark tools are ready." });
+    }
+    return ok({
+      connected: false,
+      port: PORT,
+      message: "Extension bridge NOT connected. Bookmark tools cannot reach the browser until the companion Chrome extension is loaded and Chrome is running.",
+      fix: [
+        "Make sure Google Chrome is open.",
+        "Open chrome://extensions and enable Developer mode (top-right).",
+        "Click 'Load unpacked' and select this plugin's extension/ folder.",
+        `The extension dials ws://127.0.0.1:${PORT}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
+        "Once loaded, re-run bookmarks_status to confirm."
+      ]
+    });
+  }
 );
 server.tool(
   "list_bookmarks",

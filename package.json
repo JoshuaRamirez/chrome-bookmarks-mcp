@@ -1,16 +1,32 @@
 {
   "name": "chrome-bookmarks-mcp",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": false,
   "type": "module",
   "description": "MCP server that manages Chrome's synced bookmarks through a localhost bridge to a companion Chrome extension. Every edit goes through chrome.bookmarks, so changes sync durably.",
   "license": "MIT",
-  "author": { "name": "Joshua Ramirez" },
-  "repository": { "type": "git", "url": "https://github.com/JoshuaRamirez/chrome-bookmarks-mcp.git" },
-  "bin": { "chrome-bookmarks-mcp": "dist/bundle.cjs" },
+  "author": {
+    "name": "Joshua Ramirez"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JoshuaRamirez/chrome-bookmarks-mcp.git"
+  },
+  "bin": {
+    "chrome-bookmarks-mcp": "dist/bundle.cjs"
+  },
   "main": "dist/bundle.cjs",
-  "engines": { "node": ">=18" },
-  "files": ["dist", "src", "extension", "tools", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "src",
+    "extension",
+    "tools",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "esbuild src/server.js --bundle --platform=node --format=cjs --target=node18 --outfile=dist/bundle.cjs --external:bufferutil --external:utf-8-validate",
     "start": "node dist/bundle.cjs",
@@ -23,6 +39,6 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.25.12"
   }
 }

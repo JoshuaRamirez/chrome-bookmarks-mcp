@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.8]
+
+### Security
+- Bump the esbuild build dependency to 0.25.x, clearing the moderate advisory
+  GHSA-67mh-4wv8-2f99 (esbuild dev-server request exposure). esbuild is build-only
+  and its dev server is never used here, so runtime exposure was nil; this clears
+  `npm audit` for anyone building from source. Bundle rebuilt; behavior unchanged
+  (all four test suites pass). `zod` intentionally held at 3.x (v4 is a breaking
+  major with no security driver).
+
 ## [1.0.7]
 
 ### Changed

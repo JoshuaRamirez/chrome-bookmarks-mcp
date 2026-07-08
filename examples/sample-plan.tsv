@@ -1,0 +1,5 @@
+id	proposed	current	via	title	url
+100	Bookmarks bar/Dev	Bookmarks bar	title-match	MCP Spec	https://modelcontextprotocol.io
+101	Bookmarks bar/Dev	Bookmarks bar/Unsorted	title-match	React	https://react.dev
+200	Other bookmarks/News	Other bookmarks	domain-match	Hacker News	https://news.ycombinator.com
+777	DELETE?	Other bookmarks/Unsorted	dead-link	Old dead link	http://dead.example.invalid

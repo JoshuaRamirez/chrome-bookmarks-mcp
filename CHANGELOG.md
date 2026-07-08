@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [1.0.8]
 
+### Docs / Tests
+- Add `examples/sample-plan.tsv` — a working `apply_moves` plan — and document the
+  format in USAGE.md. The apply-moves test now runs a dry-run over it and asserts
+  the move/skip/folder counts (dry-run parses without touching the browser).
+
 ### Security
 - Bump the esbuild build dependency to 0.25.x, clearing the moderate advisory
   GHSA-67mh-4wv8-2f99 (esbuild dev-server request exposure). esbuild is build-only

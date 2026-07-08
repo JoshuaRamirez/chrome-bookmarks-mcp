@@ -67,9 +67,17 @@ Large moves are worth doing deliberately:
    > **You:** Export all my bookmarks to ~/bookmarks-backup.json
    Claude calls `export_json` with that `file_path`.
 
-2. **Preview the moves.** `apply_moves` reads a plan TSV (`id, proposed, current,
-   via, title, url`). Run it with `dry_run: true` to see counts and targets
-   without touching anything.
+2. **Preview the moves.** `apply_moves` reads a tab-separated plan with columns
+   `id, proposed, current, via, title, url` — one row per bookmark, where
+   `proposed` is the destination folder path (or the literal `DELETE?` to drop a
+   row when `delete_junk: true`). Only `id` and `proposed` drive the action; the
+   rest is human context. See **[sample-plan.tsv](sample-plan.tsv)** for a
+   working example. Run with `dry_run: true` first to see counts and targets:
+
+   ```json
+   { "dry_run": true, "moved": 3, "deleted": 0, "skipped": 1,
+     "distinct_target_folders": 2, "errors": 0 }
+   ```
 
 3. **Apply.** Re-run `apply_moves` without `dry_run`. Missing target folders are
    created automatically.

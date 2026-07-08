@@ -8,8 +8,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { writeFile, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Bridge } from "./bridge.js";
 
 // Fallback location for an apply_moves plan when no explicit file_path is given.
@@ -18,11 +20,29 @@ const PLAN_DEFAULT =
   process.env.BOOKMARK_PLAN_FILE ||
   join(homedir() || tmpdir(), ".chrome-bookmarks-mcp", "proposed-moves.tsv");
 
+// Absolute path to the companion Chrome extension, resolved relative to this
+// file's location. The server ships alongside extension/ (both at the plugin
+// root: dist/bundle.cjs → ../extension; src/server.js → ../extension). We hand
+// this exact path to the user for chrome://extensions → "Load unpacked".
+const EXTENSION_DIR = (() => {
+  // Works both as the CJS bundle (Node provides __dirname) and as ESM source
+  // (import.meta.url). esbuild leaves import.meta.url undefined in CJS output,
+  // so __dirname must be tried first.
+  const here = typeof __dirname !== "undefined"
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url));
+  for (const rel of ["../extension", "./extension"]) {
+    const p = resolve(here, rel);
+    if (existsSync(join(p, "manifest.json"))) return p;
+  }
+  return resolve(here, "../extension"); // best-effort default if not found
+})();
+
 const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.5" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.6" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -67,11 +87,12 @@ server.tool("bookmarks_status",
       connected: false,
       listening: s.listening,
       port: s.port,
+      extension_dir: EXTENSION_DIR,
       message: "Extension bridge NOT connected. The server is listening, but the companion Chrome extension hasn't connected yet.",
       fix: [
         "Make sure Google Chrome is open.",
         "Open chrome://extensions and enable Developer mode (top-right).",
-        "Click 'Load unpacked' and select this plugin's extension/ folder.",
+        `Click 'Load unpacked' and select this exact folder: ${EXTENSION_DIR}`,
         `The extension dials ws://127.0.0.1:${s.port}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
         "Once loaded, re-run bookmarks_status to confirm."
       ]

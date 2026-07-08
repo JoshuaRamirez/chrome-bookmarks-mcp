@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.6]
+
+### Added
+- When disconnected, `bookmarks_status` now includes `extension_dir` — the
+  **exact absolute path** to the companion extension — and the "Load unpacked"
+  step names that path directly, so there is no guessing which folder to select.
+
+### Fixed
+- Resolved the extension path via `__dirname` (with an ESM `import.meta.url`
+  fallback); esbuild leaves `import.meta.url` undefined in the CJS bundle, which
+  would otherwise have crashed server startup. The smoke test now asserts
+  `extension_dir` resolves to a real manifest, guarding against a regression.
+
 ## [1.0.5]
 
 ### Changed

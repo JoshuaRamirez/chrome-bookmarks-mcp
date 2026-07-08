@@ -54,8 +54,10 @@ find the plugin root (typically
 4. The full bookmark manager opens on first load; re-open any time from the
    toolbar icon
 
-Once the extension is loaded and Chrome is running, ask Claude to run
-`bookmarks_status` to confirm the bridge is connected.
+Not sure which folder to pick? Ask Claude to run `bookmarks_status` — while
+disconnected it prints the **exact absolute path** to load (its `extension_dir`
+field). Once loaded and Chrome is running, run it again to confirm the bridge is
+connected.
 
 ## Tools
 

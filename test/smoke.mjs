@@ -7,6 +7,7 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -80,6 +81,16 @@ async function finish() {
     pass("bookmarks_status — returns setup guidance when disconnected");
   } else {
     fail(`bookmarks_status — expected connected:false with a fix[] list, got ${statusText.slice(0, 120)}`);
+  }
+
+  // 4. extension_dir resolves to a real folder containing the extension manifest.
+  // (Also guards that the server actually started — a resolution bug here once
+  // crashed startup before any response was produced.)
+  const extDir = status?.extension_dir;
+  if (extDir && existsSync(join(extDir, "manifest.json"))) {
+    pass("bookmarks_status — extension_dir points at the real extension manifest");
+  } else {
+    fail(`bookmarks_status — extension_dir did not resolve to a manifest: ${extDir}`);
   }
 
   console.log(process.exitCode ? "\nSMOKE TEST FAILED" : "\nSMOKE TEST PASSED");

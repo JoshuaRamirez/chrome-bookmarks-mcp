@@ -2980,7 +2980,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve.call(this, root, ref);
+      let _sch = resolve2.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3007,7 +3007,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve(root, ref) {
+    function resolve2(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3638,7 +3638,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve(baseURI, relativeURI, options) {
+    function resolve2(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3896,7 +3896,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve,
+      resolve: resolve2,
       resolveComponent,
       equal,
       serialize,
@@ -22656,7 +22656,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -22673,7 +22673,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -22751,7 +22751,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve(parseResult.data);
+            resolve2(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -23012,12 +23012,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve, interval);
+      const timeoutId = setTimeout(resolve2, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -24117,7 +24117,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -24766,12 +24766,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve) => {
+    return new Promise((resolve2) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve();
+        resolve2();
       } else {
-        this._stdout.once("drain", resolve);
+        this._stdout.once("drain", resolve2);
       }
     });
   }
@@ -24779,8 +24779,10 @@ var StdioServerTransport = class {
 
 // src/server.js
 var import_promises = require("node:fs/promises");
+var import_node_fs = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path = require("node:path");
+var import_node_url = require("node:url");
 
 // node_modules/ws/wrapper.mjs
 var import_stream = __toESM(require_stream(), 1);
@@ -24854,10 +24856,10 @@ var Bridge = class {
       return;
     }
     if (msg.id != null && this.pending.has(msg.id)) {
-      const { resolve, reject, timer } = this.pending.get(msg.id);
+      const { resolve: resolve2, reject, timer } = this.pending.get(msg.id);
       clearTimeout(timer);
       this.pending.delete(msg.id);
-      if (msg.ok) resolve(msg.result);
+      if (msg.ok) resolve2(msg.result);
       else reject(new Error(msg.error || "bridge error"));
     }
   }
@@ -24865,7 +24867,7 @@ var Bridge = class {
     return !!(this.sock && this.sock.readyState === 1);
   }
   call(method, params = {}, timeoutMs = 15e3) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       if (!this.connected()) {
         reject(new Error("Chrome bridge not connected \u2014 run the bookmarks_status tool for setup steps. (Chrome must be open with the companion Bookmark Manager extension loaded via chrome://extensions \u2192 Load unpacked.)"));
         return;
@@ -24875,7 +24877,7 @@ var Bridge = class {
         this.pending.delete(id);
         reject(new Error(`bridge timeout waiting for "${method}"`));
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { resolve: resolve2, reject, timer });
       try {
         this.sock.send(JSON.stringify({ id, method, params }));
       } catch (e) {
@@ -24888,11 +24890,20 @@ var Bridge = class {
 };
 
 // src/server.js
+var import_meta = {};
 var PLAN_DEFAULT = process.env.BOOKMARK_PLAN_FILE || (0, import_node_path.join)((0, import_node_os.homedir)() || (0, import_node_os.tmpdir)(), ".chrome-bookmarks-mcp", "proposed-moves.tsv");
+var EXTENSION_DIR = (() => {
+  const here = typeof __dirname !== "undefined" ? __dirname : (0, import_node_path.dirname)((0, import_node_url.fileURLToPath)(import_meta.url));
+  for (const rel of ["../extension", "./extension"]) {
+    const p = (0, import_node_path.resolve)(here, rel);
+    if ((0, import_node_fs.existsSync)((0, import_node_path.join)(p, "manifest.json"))) return p;
+  }
+  return (0, import_node_path.resolve)(here, "../extension");
+})();
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.5" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.6" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24929,11 +24940,12 @@ server.tool(
       connected: false,
       listening: s.listening,
       port: s.port,
+      extension_dir: EXTENSION_DIR,
       message: "Extension bridge NOT connected. The server is listening, but the companion Chrome extension hasn't connected yet.",
       fix: [
         "Make sure Google Chrome is open.",
         "Open chrome://extensions and enable Developer mode (top-right).",
-        "Click 'Load unpacked' and select this plugin's extension/ folder.",
+        `Click 'Load unpacked' and select this exact folder: ${EXTENSION_DIR}`,
         `The extension dials ws://127.0.0.1:${s.port}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
         "Once loaded, re-run bookmarks_status to confirm."
       ]

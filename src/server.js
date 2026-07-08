@@ -22,7 +22,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.3" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.4" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -41,18 +41,38 @@ server.tool("bookmarks_status",
   "Report whether the Chrome extension bridge is connected and on what port. When disconnected, returns step-by-step setup guidance — call this first if any other tool fails to reach the browser.",
   {},
   async () => {
-    if (bridge.connected()) {
-      return ok({ connected: true, port: PORT, message: "Extension bridge connected — all bookmark tools are ready." });
+    const s = bridge.status();
+    if (s.connected) {
+      return ok({ connected: true, port: s.port, message: "Extension bridge connected — all bookmark tools are ready." });
     }
+    // The port never bound — almost always another server instance holding it.
+    if (s.bindError) {
+      const inUse = s.bindError.code === "EADDRINUSE";
+      return ok({
+        connected: false,
+        listening: false,
+        port: s.port,
+        message: inUse
+          ? `Could not bind port ${s.port} (EADDRINUSE) — another process is already using it, most likely a second copy of this server.`
+          : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
+        fix: [
+          `Stop the other process using port ${s.port} (e.g. another running chrome-bookmarks server), or`,
+          "Set BOOKMARK_BRIDGE_PORT to a free port for this server, and set the matching BRIDGE_URL in extension/bridge.js.",
+          "Then restart and re-run bookmarks_status."
+        ]
+      });
+    }
+    // Port is bound and waiting; the extension simply hasn't dialed in yet.
     return ok({
       connected: false,
-      port: PORT,
-      message: "Extension bridge NOT connected. Bookmark tools cannot reach the browser until the companion Chrome extension is loaded and Chrome is running.",
+      listening: s.listening,
+      port: s.port,
+      message: "Extension bridge NOT connected. The server is listening, but the companion Chrome extension hasn't connected yet.",
       fix: [
         "Make sure Google Chrome is open.",
         "Open chrome://extensions and enable Developer mode (top-right).",
         "Click 'Load unpacked' and select this plugin's extension/ folder.",
-        `The extension dials ws://127.0.0.1:${PORT}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
+        `The extension dials ws://127.0.0.1:${s.port}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
         "Once loaded, re-run bookmarks_status to confirm."
       ]
     });

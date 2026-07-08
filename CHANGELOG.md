@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.4]
+
+### Added
+- Bridge now tracks bind state; `bookmarks_status` distinguishes three cases:
+  connected, listening-but-no-extension, and **port bind failure (EADDRINUSE)** —
+  the last returns a targeted fix ("another server is already on this port; free
+  it or change BOOKMARK_BRIDGE_PORT") instead of a misleading "not connected".
+- `test/port-conflict.mjs` — CI test proving the EADDRINUSE diagnostic.
+
+### Fixed
+- `probe.mjs` usage comment (`npm run probe`, not `node probe.mjs`).
+
 ## [1.0.3]
 
 ### Added

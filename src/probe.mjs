@@ -3,7 +3,7 @@
 // extension<->server link without the MCP layer. Run while the real MCP server
 // is NOT running (they share the port).
 //
-//   node probe.mjs
+//   npm run probe        (from the repo root)
 
 import { Bridge } from "./bridge.js";
 

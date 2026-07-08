@@ -12,10 +12,17 @@ export class Bridge {
     this.sock = null;        // the single active extension socket
     this.seq = 1;
     this.pending = new Map(); // id -> {resolve, reject, timer}
+    this.listening = false;  // did the WebSocket server bind the port?
+    this.bindError = null;    // { code, message } if binding failed (e.g. EADDRINUSE)
   }
 
   start() {
     this.wss = new WebSocketServer({ host: "127.0.0.1", port: this.port });
+    this.wss.on("listening", () => {
+      this.listening = true;
+      this.bindError = null;
+      this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
+    });
     this.wss.on("connection", (ws) => {
       this.sock = ws;
       this.log("[bridge] extension connected");
@@ -23,13 +30,28 @@ export class Bridge {
       ws.on("close", () => { if (this.sock === ws) this.sock = null; this.log("[bridge] extension disconnected"); });
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
     });
-    this.wss.on("error", (e) => this.log("[bridge] server error:", e.message));
+    this.wss.on("error", (e) => {
+      // A bind failure (typically EADDRINUSE) means another process already holds
+      // the port — most often a second copy of this server. Record it so
+      // bookmarks_status can explain the real cause instead of "not connected".
+      if (!this.listening) this.bindError = { code: e.code || "", message: e.message };
+      this.log("[bridge] server error:", e.message);
+    });
     // Periodic ping keeps the extension's MV3 service worker alive (WebSocket
     // traffic resets its idle-shutdown timer).
     this._ka = setInterval(() => {
       if (this.connected()) { try { this.sock.send(JSON.stringify({ method: "ping" })); } catch {} }
     }, 20000);
-    this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
+  }
+
+  // Snapshot of the bridge's health for diagnostics.
+  status() {
+    return {
+      connected: this.connected(),
+      listening: this.listening,
+      port: this.port,
+      bindError: this.bindError,
+    };
   }
 
   _onMessage(buf) {

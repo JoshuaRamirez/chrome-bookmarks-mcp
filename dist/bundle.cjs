@@ -24800,9 +24800,16 @@ var Bridge = class {
     this.sock = null;
     this.seq = 1;
     this.pending = /* @__PURE__ */ new Map();
+    this.listening = false;
+    this.bindError = null;
   }
   start() {
     this.wss = new import_websocket_server.default({ host: "127.0.0.1", port: this.port });
+    this.wss.on("listening", () => {
+      this.listening = true;
+      this.bindError = null;
+      this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
+    });
     this.wss.on("connection", (ws) => {
       this.sock = ws;
       this.log("[bridge] extension connected");
@@ -24813,7 +24820,10 @@ var Bridge = class {
       });
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
     });
-    this.wss.on("error", (e) => this.log("[bridge] server error:", e.message));
+    this.wss.on("error", (e) => {
+      if (!this.listening) this.bindError = { code: e.code || "", message: e.message };
+      this.log("[bridge] server error:", e.message);
+    });
     this._ka = setInterval(() => {
       if (this.connected()) {
         try {
@@ -24822,7 +24832,15 @@ var Bridge = class {
         }
       }
     }, 2e4);
-    this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
+  }
+  // Snapshot of the bridge's health for diagnostics.
+  status() {
+    return {
+      connected: this.connected(),
+      listening: this.listening,
+      port: this.port,
+      bindError: this.bindError
+    };
   }
   _onMessage(buf) {
     let msg;
@@ -24874,7 +24892,7 @@ var PLAN_DEFAULT = process.env.BOOKMARK_PLAN_FILE || (0, import_node_path.join)(
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.3" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.4" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24889,18 +24907,34 @@ server.tool(
   "Report whether the Chrome extension bridge is connected and on what port. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
   {},
   async () => {
-    if (bridge.connected()) {
-      return ok({ connected: true, port: PORT, message: "Extension bridge connected \u2014 all bookmark tools are ready." });
+    const s = bridge.status();
+    if (s.connected) {
+      return ok({ connected: true, port: s.port, message: "Extension bridge connected \u2014 all bookmark tools are ready." });
+    }
+    if (s.bindError) {
+      const inUse = s.bindError.code === "EADDRINUSE";
+      return ok({
+        connected: false,
+        listening: false,
+        port: s.port,
+        message: inUse ? `Could not bind port ${s.port} (EADDRINUSE) \u2014 another process is already using it, most likely a second copy of this server.` : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
+        fix: [
+          `Stop the other process using port ${s.port} (e.g. another running chrome-bookmarks server), or`,
+          "Set BOOKMARK_BRIDGE_PORT to a free port for this server, and set the matching BRIDGE_URL in extension/bridge.js.",
+          "Then restart and re-run bookmarks_status."
+        ]
+      });
     }
     return ok({
       connected: false,
-      port: PORT,
-      message: "Extension bridge NOT connected. Bookmark tools cannot reach the browser until the companion Chrome extension is loaded and Chrome is running.",
+      listening: s.listening,
+      port: s.port,
+      message: "Extension bridge NOT connected. The server is listening, but the companion Chrome extension hasn't connected yet.",
       fix: [
         "Make sure Google Chrome is open.",
         "Open chrome://extensions and enable Developer mode (top-right).",
         "Click 'Load unpacked' and select this plugin's extension/ folder.",
-        `The extension dials ws://127.0.0.1:${PORT}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
+        `The extension dials ws://127.0.0.1:${s.port}. If you set BOOKMARK_BRIDGE_PORT to a non-default port, update BRIDGE_URL in extension/bridge.js to match.`,
         "Once loaded, re-run bookmarks_status to confirm."
       ]
     });

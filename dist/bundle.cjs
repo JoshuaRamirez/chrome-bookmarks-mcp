@@ -24903,7 +24903,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.6" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.7" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -25069,7 +25069,11 @@ server.tool(
   async ({ file_path }) => {
     const data = await bridge.call("export", {});
     if (file_path) {
-      await (0, import_promises.writeFile)(file_path, JSON.stringify(data, null, 2));
+      try {
+        await (0, import_promises.writeFile)(file_path, JSON.stringify(data, null, 2));
+      } catch (e) {
+        throw new Error(`Could not write export to ${file_path}: ${e.message}`);
+      }
       return ok({ written: file_path });
     }
     return ok(data);
@@ -25081,7 +25085,19 @@ server.tool(
   { file_path: external_exports.string().optional(), dry_run: external_exports.boolean().optional(), delete_junk: external_exports.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
     const path = file_path || PLAN_DEFAULT;
-    const lines = (await (0, import_promises.readFile)(path, "utf8")).split(/\r?\n/).filter(Boolean);
+    let raw;
+    try {
+      raw = await (0, import_promises.readFile)(path, "utf8");
+    } catch (e) {
+      if (e.code === "ENOENT") {
+        throw new Error(`No plan file found at ${path}. apply_moves reads a TSV with columns: id, proposed, current, via, title, url. Pass file_path, or set BOOKMARK_PLAN_FILE, then retry.`);
+      }
+      throw new Error(`Could not read plan file ${path}: ${e.message}`);
+    }
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+    if (lines.length <= 1) {
+      throw new Error(`Plan file ${path} has no data rows. Expected a header line followed by TSV rows (id, proposed, current, via, title, url).`);
+    }
     lines.shift();
     const folderId = /* @__PURE__ */ new Map();
     let moved = 0, deleted = 0, skipped = 0;

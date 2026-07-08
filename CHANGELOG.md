@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.7]
+
+### Changed
+- `apply_moves` now returns a clear, actionable message when the plan file is
+  missing or empty (name the path, how to supply one) instead of a raw `ENOENT`.
+- `export_json` wraps write failures with the target path and cause.
+
+### Added
+- `test/apply-moves.mjs` — asserts the missing-plan-file message via the MCP
+  protocol (no browser needed).
+
 ## [1.0.6]
 
 ### Added

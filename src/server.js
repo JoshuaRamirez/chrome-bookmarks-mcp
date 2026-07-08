@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.6" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.7" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -196,7 +196,11 @@ server.tool("export_json",
   { file_path: z.string().optional() },
   async ({ file_path }) => {
     const data = await bridge.call("export", {});
-    if (file_path) { await writeFile(file_path, JSON.stringify(data, null, 2)); return ok({ written: file_path }); }
+    if (file_path) {
+      try { await writeFile(file_path, JSON.stringify(data, null, 2)); }
+      catch (e) { throw new Error(`Could not write export to ${file_path}: ${e.message}`); }
+      return ok({ written: file_path });
+    }
     return ok(data);
   });
 
@@ -205,7 +209,19 @@ server.tool("apply_moves",
   { file_path: z.string().optional(), dry_run: z.boolean().optional(), delete_junk: z.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
     const path = file_path || PLAN_DEFAULT;
-    const lines = (await readFile(path, "utf8")).split(/\r?\n/).filter(Boolean);
+    let raw;
+    try {
+      raw = await readFile(path, "utf8");
+    } catch (e) {
+      if (e.code === "ENOENT") {
+        throw new Error(`No plan file found at ${path}. apply_moves reads a TSV with columns: id, proposed, current, via, title, url. Pass file_path, or set BOOKMARK_PLAN_FILE, then retry.`);
+      }
+      throw new Error(`Could not read plan file ${path}: ${e.message}`);
+    }
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+    if (lines.length <= 1) {
+      throw new Error(`Plan file ${path} has no data rows. Expected a header line followed by TSV rows (id, proposed, current, via, title, url).`);
+    }
     lines.shift(); // header
     const folderId = new Map();
     let moved = 0, deleted = 0, skipped = 0;

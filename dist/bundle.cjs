@@ -24905,7 +24905,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.1" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.2" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24986,11 +24986,11 @@ server.tool(
 );
 server.tool(
   "add_bookmark",
-  "Add a bookmark. Target a folder by folder_path (created if missing, default 'Bookmarks bar') or by parent_id.",
+  "Add a bookmark. Target a folder by folder_path (created if missing, default 'Bookmarks bar') or by parent_id. A folder_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   {
     title: external_exports.string(),
     url: external_exports.string(),
-    folder_path: external_exports.string().optional().describe("e.g. 'Bookmarks bar/AspenESS'"),
+    folder_path: external_exports.string().optional().describe("slash path whose top level is a permanent root, e.g. 'Bookmarks bar/AspenESS'"),
     parent_id: external_exports.string().optional()
   },
   async ({ title, url, folder_path, parent_id }) => {
@@ -25000,7 +25000,7 @@ server.tool(
 );
 server.tool(
   "create_folder",
-  "Create a folder under parent_path (created if missing, default 'Bookmarks bar') or parent_id.",
+  "Create a folder under parent_path (created if missing, default 'Bookmarks bar') or parent_id. A parent_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   {
     name: external_exports.string(),
     parent_path: external_exports.string().optional(),
@@ -25024,7 +25024,7 @@ server.tool(
 );
 server.tool(
   "move_bookmark",
-  "Move a node into a folder by to_path (created if missing) or to_parent_id.",
+  "Move a node into a folder by to_path (created if missing) or to_parent_id. A to_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { id: external_exports.string(), to_path: external_exports.string().optional(), to_parent_id: external_exports.string().optional() },
   async ({ id, to_path, to_parent_id }) => {
     const pid = await resolveFolder(to_parent_id, to_path, null);

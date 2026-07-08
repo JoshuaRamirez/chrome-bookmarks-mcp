@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.2]
+
+### Changed
+- Tool descriptions for `add_bookmark`, `create_folder`, and `move_bookmark` now
+  state that a folder path's top level must be a permanent root (`Bookmarks bar`,
+  `Other bookmarks`, or `Mobile bookmarks`) — previously only `ensure_folder_path`
+  said so. Helps the driving model target folders correctly on the first try.
+
 ## [1.1.1]
 
 ### Fixed

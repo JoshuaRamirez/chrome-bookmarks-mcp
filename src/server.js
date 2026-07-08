@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.1" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.2" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -125,11 +125,11 @@ server.tool("ensure_folder_path",
   async ({ path }) => ok(await bridge.call("ensure_path", { path: splitPath(path) })));
 
 server.tool("add_bookmark",
-  "Add a bookmark. Target a folder by folder_path (created if missing, default 'Bookmarks bar') or by parent_id.",
+  "Add a bookmark. Target a folder by folder_path (created if missing, default 'Bookmarks bar') or by parent_id. A folder_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   {
     title: z.string(),
     url: z.string(),
-    folder_path: z.string().optional().describe("e.g. 'Bookmarks bar/AspenESS'"),
+    folder_path: z.string().optional().describe("slash path whose top level is a permanent root, e.g. 'Bookmarks bar/AspenESS'"),
     parent_id: z.string().optional()
   },
   async ({ title, url, folder_path, parent_id }) => {
@@ -138,7 +138,7 @@ server.tool("add_bookmark",
   });
 
 server.tool("create_folder",
-  "Create a folder under parent_path (created if missing, default 'Bookmarks bar') or parent_id.",
+  "Create a folder under parent_path (created if missing, default 'Bookmarks bar') or parent_id. A parent_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   {
     name: z.string(),
     parent_path: z.string().optional(),
@@ -160,7 +160,7 @@ server.tool("update_bookmark",
   });
 
 server.tool("move_bookmark",
-  "Move a node into a folder by to_path (created if missing) or to_parent_id.",
+  "Move a node into a folder by to_path (created if missing) or to_parent_id. A to_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { id: z.string(), to_path: z.string().optional(), to_parent_id: z.string().optional() },
   async ({ id, to_path, to_parent_id }) => {
     const pid = await resolveFolder(to_parent_id, to_path, null);

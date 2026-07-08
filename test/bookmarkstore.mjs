@@ -91,6 +91,16 @@ check("searchWithPaths attaches folder context",
   results.length === 2 && r102?.folder === "Bookmarks bar" && r201?.folder === "Other bookmarks",
   JSON.stringify(results));
 
+const all = await BookmarkStore.listBookmarks();
+check("listBookmarks returns a flat list of all bookmarks with folders",
+  all.length === 5 && all.every((b) => b.id && b.url && b.folder),
+  JSON.stringify(all));
+
+const scoped = await BookmarkStore.listBookmarks("Bookmarks bar/Dev");
+check("listBookmarks scopes to a folder path and its subfolders",
+  scoped.length === 2 && scoped.every((b) => b.folder === "Bookmarks bar / Dev"),
+  JSON.stringify(scoped));
+
 const exported = await BookmarkStore.exportTree();
 check("exportTree unwraps to permanent roots with children",
   Array.isArray(exported.children) && exported.children.some((c) => c.title === "Bookmarks bar"),

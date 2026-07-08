@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.9]
+
+### Changed
+- `list_bookmarks` now returns a **flat array** of `{id, title, url, folder}` and
+  accepts an optional `folder_path` to scope results to a folder (and its
+  subfolders). Previously it returned the entire raw nested tree, which for a
+  large collection is an enormous payload that can overflow the client's context.
+  Covered by two new `BookmarkStore` tests.
+
 ## [1.0.8]
 
 ### Docs / Tests

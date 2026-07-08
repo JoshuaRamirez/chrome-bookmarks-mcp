@@ -77,6 +77,24 @@ class BookmarkStore {
     return { folders, urls };
   }
 
+  // Flat list of bookmarks as { id, title, url, folder }. Optionally scoped to a
+  // folder path (e.g. "Bookmarks bar / Dev"), matching that folder and anything
+  // beneath it. Flat + scoped keeps results bounded — the whole nested tree is
+  // rarely what a caller wants and can be very large.
+  static async listBookmarks(folderPath) {
+    const prefix = folderPath
+      ? String(folderPath).split("/").map((s) => s.trim()).filter(Boolean).join(" / ")
+      : "";
+    const out = [];
+    await BookmarkStore.walk((node, _p, _d, path) => {
+      if (!node.url) return;
+      const folder = path.filter(Boolean).join(" / ") || "(root)";
+      if (prefix && folder !== prefix && !folder.startsWith(prefix + " / ")) return;
+      out.push({ id: node.id, title: node.title, url: node.url, folder });
+    });
+    return out;
+  }
+
   // Groups of bookmarks sharing a URL (length > 1), with folder context.
   static async findDuplicates() {
     const byUrl = new Map();

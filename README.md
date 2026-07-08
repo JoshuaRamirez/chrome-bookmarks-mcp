@@ -71,7 +71,7 @@ connected.
 | `bookmarks_status` | Is the extension bridge connected? |
 | `stats` | Count of folders and URLs |
 | `list_folders` | Every folder with id, depth, and full path |
-| `list_bookmarks` | Full nested bookmark tree |
+| `list_bookmarks` | Flat list of bookmarks (`{id,title,url,folder}`), optionally scoped to a folder path |
 | `search_bookmarks` | Live filter across all bookmarks |
 | `add_bookmark` | Create a bookmark, targeting any folder or path |
 | `create_folder` | Create a folder under any parent or path |

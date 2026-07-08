@@ -24905,7 +24905,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.8" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.9" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24956,9 +24956,9 @@ server.tool(
 );
 server.tool(
   "list_bookmarks",
-  "Return the full bookmark tree (all folders and bookmarks, nested).",
-  {},
-  async () => ok(await bridge.call("get_tree"))
+  "List bookmarks as a flat array of {id, title, url, folder}. Optionally scope to a folder path (e.g. 'Bookmarks bar/Dev') to avoid returning the whole tree; omit to list everything.",
+  { folder_path: external_exports.string().optional().describe("only list bookmarks within this folder path and its subfolders") },
+  async ({ folder_path }) => ok(await bridge.call("list_bookmarks", { folderPath: folder_path }))
 );
 server.tool(
   "list_folders",

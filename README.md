@@ -28,6 +28,11 @@ Claude Code ──stdio──▶ MCP server ──ws://127.0.0.1:8765──▶ C
 The MCP server can only act while Chrome is open with the extension loaded; the
 `bookmarks_status` tool reports whether the bridge is connected.
 
+## Requirements
+
+- **Node.js 18+** (the MCP host runs the bundled server)
+- **Google Chrome** (or a Chromium browser supporting unpacked MV3 extensions)
+
 ## Install
 
 ### 1. The plugin (MCP server)

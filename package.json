@@ -9,6 +9,7 @@
   "repository": { "type": "git", "url": "https://github.com/JoshuaRamirez/chrome-bookmarks-mcp.git" },
   "bin": { "chrome-bookmarks-mcp": "dist/bundle.cjs" },
   "main": "dist/bundle.cjs",
+  "engines": { "node": ">=18" },
   "files": ["dist", "src", "extension", "tools", "README.md", "LICENSE"],
   "scripts": {
     "build": "esbuild src/server.js --bundle --platform=node --format=cjs --target=node18 --outfile=dist/bundle.cjs --external:bufferutil --external:utf-8-validate",

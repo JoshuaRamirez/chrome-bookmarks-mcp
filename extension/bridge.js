@@ -36,7 +36,7 @@ async function bridgeDispatch(method, p) {
   switch (method) {
     case "get_tree":        return chrome.bookmarks.getTree();
     case "list_folders":    return BookmarkStore.listFolders();
-    case "search":          return BookmarkStore.search(p.query);
+    case "search":          return BookmarkStore.searchWithPaths(p.query);
     case "stats":           return BookmarkStore.stats();
     case "create_folder":   return BookmarkStore.createFolder(p.parentId, p.title);
     case "create_bookmark": return BookmarkStore.createBookmark(p.parentId, p.title, p.url);

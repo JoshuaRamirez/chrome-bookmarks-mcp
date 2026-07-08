@@ -23,6 +23,24 @@ class BookmarkStore {
   }
   static async search(query)      { return chrome.bookmarks.search(query); }
 
+  // Like search(), but each hit carries its containing folder path — the context
+  // callers actually want ("where is this bookmark?"). chrome.bookmarks.search
+  // returns only parentId, so we resolve every folder's path once and join.
+  static async searchWithPaths(query) {
+    const hits = await chrome.bookmarks.search(query);
+    if (!hits.length) return [];
+    const folderPath = new Map(); // folder id -> "A / B / C" (including itself)
+    await BookmarkStore.walk((node, _p, _d, path) => {
+      if (!node.url) folderPath.set(node.id, path.concat(node.title).filter(Boolean).join(" / "));
+    });
+    return hits.map(h => ({
+      id: h.id,
+      title: h.title,
+      url: h.url,
+      folder: folderPath.get(h.parentId) || "(root)"
+    }));
+  }
+
   static isPermanent(node) {
     return node.id === "0" || node.parentId === BookmarkStore.PERMANENT_PARENT;
   }

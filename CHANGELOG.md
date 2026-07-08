@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.5]
+
+### Changed
+- `search_bookmarks` results now include each hit's **folder path** (via a new
+  `BookmarkStore.searchWithPaths`), so you can see where a bookmark lives without
+  a follow-up lookup. (The bare `chrome.bookmarks.search` returns only a
+  `parentId`.)
+
+### Added
+- `test/bookmarkstore.mjs` — the extension's core `BookmarkStore` logic now runs
+  under test in Node against a mock `chrome.bookmarks` tree (stats, folder paths,
+  duplicate grouping, search-with-paths, export). Previously untested.
+
 ## [1.0.4]
 
 ### Added

@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.2]
+
+### Added
+- `npm test` — a stdio smoke test that boots the bundle and asserts the protocol
+  handshake, all 16 tools, and disconnected-state guidance.
+- GitHub Actions CI (`.github/workflows/ci.yml`): build, smoke test, and a guard
+  that fails if the committed `dist/bundle.cjs` is stale relative to source.
+- `SECURITY.md` documenting the localhost-only threat model and change scope.
+
 ## [1.0.1]
 
 ### Changed

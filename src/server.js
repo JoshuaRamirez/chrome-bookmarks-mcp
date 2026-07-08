@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.0.9" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.0" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -202,6 +202,22 @@ server.tool("export_json",
       return ok({ written: file_path });
     }
     return ok(data);
+  });
+
+server.tool("import_json",
+  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id.",
+  { file_path: z.string(), into_path: z.string().optional(), into_parent_id: z.string().optional() },
+  async ({ file_path, into_path, into_parent_id }) => {
+    let data;
+    try {
+      data = JSON.parse(await readFile(file_path, "utf8"));
+    } catch (e) {
+      if (e.code === "ENOENT") throw new Error(`No file found at ${file_path}. Pass the path to a JSON file produced by export_json.`);
+      throw new Error(`Could not read or parse ${file_path}: ${e.message}`);
+    }
+    const pid = await resolveFolder(into_parent_id, into_path, "Other bookmarks");
+    const created = await bridge.call("import", { parentId: pid, data });
+    return ok({ imported_into: pid, created });
   });
 
 server.tool("apply_moves",

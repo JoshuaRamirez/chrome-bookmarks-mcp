@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.0]
+
+### Added
+- **`import_json` tool** — recreate a previously exported bookmark JSON under a
+  target folder (`into_path`, default `Other bookmarks`). Completes the
+  export/import pair for backup and restore. Does not deduplicate. Covered by a
+  new `BookmarkStore.importInto` test (folder created before its children) and
+  the tool-presence smoke check (now 17 tools).
+
 ## [1.0.9]
 
 ### Changed

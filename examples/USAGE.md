@@ -65,7 +65,9 @@ Large moves are worth doing deliberately:
 
 1. **Back up first.**
    > **You:** Export all my bookmarks to ~/bookmarks-backup.json
-   Claude calls `export_json` with that `file_path`.
+   Claude calls `export_json` with that `file_path`. To restore later, ask Claude
+   to import it — `import_json` recreates that tree under a folder you choose
+   (default `Other bookmarks`).
 
 2. **Preview the moves.** `apply_moves` reads a tab-separated plan with columns
    `id, proposed, current, via, title, url` — one row per bookmark, where

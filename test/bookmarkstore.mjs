@@ -60,6 +60,15 @@ globalThis.chrome = {
       return ALL.filter((n) => n.url && ((n.title || "").toLowerCase().includes(q) || n.url.toLowerCase().includes(q)))
         .map((n) => ({ id: n.id, title: n.title, url: n.url, parentId: n.parentId }));
     },
+    // Minimal create: record the node and hand back a fresh id (importInto needs
+    // the returned id to nest children under a newly-created folder).
+    _created: [],
+    async create(node) {
+      const id = "new" + (this._created.length + 1);
+      const made = { id, ...node };
+      this._created.push(made);
+      return made;
+    },
   },
 };
 
@@ -105,6 +114,23 @@ const exported = await BookmarkStore.exportTree();
 check("exportTree unwraps to permanent roots with children",
   Array.isArray(exported.children) && exported.children.some((c) => c.title === "Bookmarks bar"),
   JSON.stringify(exported).slice(0, 120));
+
+// importInto: a rootless container with one folder holding two bookmarks →
+// 3 nodes created (the folder + 2 bookmarks), and the folder is created before
+// its children so nesting works.
+const importData = { children: [
+  { title: "Imported", children: [
+    { title: "A", url: "https://a.test" },
+    { title: "B", url: "https://b.test" },
+  ] },
+] };
+const createdCount = await BookmarkStore.importInto("2", importData);
+const folderFirst = chrome.bookmarks._created[0];
+check("importInto recreates the tree (folder then children)",
+  createdCount === 3 &&
+  chrome.bookmarks._created.length === 3 &&
+  !folderFirst.url && folderFirst.title === "Imported",
+  `created=${createdCount} nodes=${JSON.stringify(chrome.bookmarks._created)}`);
 
 console.log(failed ? `\nBOOKMARKSTORE TESTS FAILED (${failed})` : "\nBOOKMARKSTORE TESTS PASSED");
 process.exit(failed ? 1 : 0);

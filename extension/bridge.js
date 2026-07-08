@@ -47,6 +47,7 @@ async function bridgeDispatch(method, p) {
     case "remove":          return BookmarkStore.remove(p.id, !!p.recursive);
     case "find_duplicates": return BookmarkStore.findDuplicates();
     case "export":          return BookmarkStore.exportTree(p.rootId);
+    case "import":          return BookmarkStore.importInto(p.parentId, p.data);
     case "ensure_path":     return ensurePath(p.path || []);
     default: throw new Error("unknown method: " + method);
   }

@@ -20,7 +20,7 @@ Claude Code ──stdio──▶ MCP server ──ws://127.0.0.1:8765──▶ C
               (this plugin)          (localhost bridge)      (load unpacked)      (synced store)
 ```
 
-- **MCP server** (`dist/bundle.cjs`) — a stdio MCP server exposing 16 bookmark
+- **MCP server** (`dist/bundle.cjs`) — a stdio MCP server exposing 17 bookmark
   tools. It starts a localhost WebSocket bridge on port `8765`.
 - **Chrome extension** (`extension/`) — dials into that bridge and runs each
   operation inside the browser's `chrome.bookmarks` context.
@@ -84,6 +84,7 @@ connected.
 | `remove_empty_folders` | Prune folders with no descendants (supports `dry_run`) |
 | `apply_moves` | Batch-move bookmarks from a plan TSV (supports `dry_run`) |
 | `export_json` | Export the whole tree as portable JSON |
+| `import_json` | Recreate an exported JSON tree under a target folder (backup restore) |
 
 See **[examples/USAGE.md](examples/USAGE.md)** for a step-by-step walkthrough —
 first-run check, adding to a folder, safe deduplication, and batch reorganization.

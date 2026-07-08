@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.0.3]
+
+### Added
+- Extension icons (16/48/128) — a bookmark-ribbon glyph, so the toolbar button
+  and `chrome://extensions` entry show real branding instead of the default
+  puzzle piece. Source SVG committed at `extension/icons/icon.svg`.
+
 ## [1.0.2]
 
 ### Added

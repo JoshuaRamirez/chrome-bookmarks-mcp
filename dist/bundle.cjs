@@ -24874,7 +24874,7 @@ var PLAN_DEFAULT = process.env.BOOKMARK_PLAN_FILE || (0, import_node_path.join)(
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.2" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.0.3" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });

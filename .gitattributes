@@ -1,0 +1,7 @@
+# The MCP server is shipped pre-bundled. It is a generated artifact — exclude it
+# from GitHub language stats and collapse it in diffs.
+dist/bundle.cjs linguist-generated=true
+
+# Keep line endings stable across platforms for source and text assets.
+* text=auto eol=lf
+*.png binary

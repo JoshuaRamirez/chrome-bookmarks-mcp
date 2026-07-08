@@ -1,5 +1,10 @@
 # Chrome Bookmarks MCP
 
+<img src="extension/icons/icon-128.png" align="right" width="88" height="88" alt="Chrome Bookmarks MCP icon">
+
+[![CI](https://github.com/JoshuaRamirez/chrome-bookmarks-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/JoshuaRamirez/chrome-bookmarks-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
+
 Manage Chrome's **synced** bookmarks from Claude Code — list, search, add, move,
 rename, deduplicate, and reorganize whole folder trees. Every edit goes through
 Chrome's official `chrome.bookmarks` API, so changes are written into Chrome's
@@ -108,8 +113,12 @@ need to reload it — just make sure Chrome is running.
 ```
 npm install
 npm run build      # esbuild → dist/bundle.cjs
-npm run probe      # optional: connectivity probe
+npm test           # smoke + port-conflict suites (no browser needed)
+npm run probe      # optional: live connectivity probe (needs the extension)
 ```
+
+Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** — note that `dist/bundle.cjs`
+is committed, so any `src/` change must be rebuilt and committed (CI enforces this).
 
 ## Privacy
 

@@ -24990,7 +24990,7 @@ server.tool(
   {
     title: external_exports.string(),
     url: external_exports.string(),
-    folder_path: external_exports.string().optional().describe("slash path whose top level is a permanent root, e.g. 'Bookmarks bar/AspenESS'"),
+    folder_path: external_exports.string().optional().describe("slash path whose top level is a permanent root, e.g. 'Bookmarks bar/Work'"),
     parent_id: external_exports.string().optional()
   },
   async ({ title, url, folder_path, parent_id }) => {

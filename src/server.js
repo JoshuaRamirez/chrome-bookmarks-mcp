@@ -129,7 +129,7 @@ server.tool("add_bookmark",
   {
     title: z.string(),
     url: z.string(),
-    folder_path: z.string().optional().describe("slash path whose top level is a permanent root, e.g. 'Bookmarks bar/AspenESS'"),
+    folder_path: z.string().optional().describe("slash path whose top level is a permanent root, e.g. 'Bookmarks bar/Work'"),
     parent_id: z.string().optional()
   },
   async ({ title, url, folder_path, parent_id }) => {

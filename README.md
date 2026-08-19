@@ -122,7 +122,7 @@ need to reload it — just make sure Chrome is running.
 ```
 npm install
 npm run build      # esbuild → dist/bundle.cjs
-npm test           # smoke + port-conflict suites (no browser needed)
+npm test           # smoke + port-conflict + bookmarkstore + apply-moves (no browser needed)
 npm run probe      # optional: live connectivity probe (needs the extension)
 ```
 

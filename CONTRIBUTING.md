@@ -23,12 +23,14 @@ the port; the extension dials it. See the README for the data-flow diagram.
 ```
 npm install
 npm run build      # esbuild src/server.js → dist/bundle.cjs
-npm test           # boots the bundle; asserts protocol, tools, and diagnostics
+npm test           # four Node suites: protocol, diagnostics, BookmarkStore, apply_moves
 ```
 
-`npm test` runs two suites, neither of which needs Chrome:
-- `test/smoke.mjs` — handshake, all 16 tools present, disconnected-state guidance.
+`npm test` runs four suites, none of which need Chrome:
+- `test/smoke.mjs` — handshake, all 17 tools present, disconnected-state guidance.
 - `test/port-conflict.mjs` — a second server on a taken port reports EADDRINUSE.
+- `test/bookmarkstore.mjs` — BookmarkStore against a mock `chrome.bookmarks` tree.
+- `test/apply-moves.mjs` — missing-plan-file message and a dry-run over `examples/sample-plan.tsv`.
 
 ## The one rule CI enforces: rebuild the bundle
 

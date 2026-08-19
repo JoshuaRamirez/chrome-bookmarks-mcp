@@ -90,8 +90,8 @@ connected.
 See **[examples/USAGE.md](examples/USAGE.md)** for a step-by-step walkthrough —
 first-run check, adding to a folder, safe deduplication, and batch reorganization.
 
-Destructive tools (`remove_*`, `apply_moves`) accept a `dry_run` flag; export
-first for a backup.
+`remove_duplicates`, `remove_empty_folders`, and `apply_moves` accept a `dry_run`
+flag; `remove_bookmark` does not. Export first for a backup.
 
 ## Configuration
 

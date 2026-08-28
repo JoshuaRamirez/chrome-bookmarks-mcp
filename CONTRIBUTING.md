@@ -11,6 +11,7 @@ dist/bundle.cjs Pre-bundled, committed server artifact (esbuild → CommonJS)
 extension/      Chrome extension (MV3) — the browser half of the bridge
 test/           Node smoke + robustness tests (no browser needed)
 tools/          Auxiliary scripts (classify.py)
+examples/       USAGE.md walkthrough + sample-plan.tsv
 .claude-plugin/ plugin.json — Claude Code plugin manifest
 .mcp.json       Points Claude Code at dist/bundle.cjs
 ```

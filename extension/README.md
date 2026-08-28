@@ -43,11 +43,19 @@ moved, or deleted — only their contents.
   (traversal, folder enumeration, dedupe, export/import). Shared by all pages.
 - `manager.{html,css,js}` — the management UI (safe DOM construction, no innerHTML).
 - `popup.{html,js}` — quick-add current tab.
-- `background.js` — opens the manager on install.
+- `background.js` — MV3 service worker: opens the manager on install, loads
+  `lib/bookmarks.js` and `bridge.js` via `importScripts`, and keeps the MCP
+  bridge connection alive (`bridge-keepalive` alarm).
+- `bridge.js` — MCP bridge client. Dials `ws://127.0.0.1:8765` and executes
+  bookmark operations requested by the local MCP server.
 
 ## Permissions
 
 - `bookmarks` — read/write bookmarks.
 - `tabs` — read the current tab's title/URL for quick-add.
+- `alarms` — wake the service worker so it can re-establish the localhost
+  bridge if it dropped.
 
-No network access, no data leaves the browser.
+No remote network access. Bookmark data never leaves the machine; the only
+socket is loopback (`ws://127.0.0.1:8765`). The extension declares no host
+permissions and makes no external requests.

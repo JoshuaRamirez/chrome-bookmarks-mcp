@@ -74,7 +74,15 @@ Large moves are worth doing deliberately:
    `proposed` is the destination folder path (or the literal `DELETE?` to drop a
    row when `delete_junk: true`). Only `id` and `proposed` drive the action; the
    rest is human context. See **[sample-plan.tsv](sample-plan.tsv)** for a
-   working example. Run with `dry_run: true` first to see counts and targets:
+   working example.
+
+   **[`tools/classify.py`](../tools/classify.py)** is the starter plan generator:
+   it reads Chrome's AccountBookmarks and writes a TSV with those columns — it
+   moves nothing. Review the file, then feed it to `apply_moves` (`dry_run`
+   first). The script's docstring covers `BOOKMARKS_SRC` / `MOVES_OUT` and
+   optional `classify.rules.json`.
+
+   Run with `dry_run: true` first to see counts and targets:
 
    ```json
    { "dry_run": true, "moved": 3, "deleted": 0, "skipped": 1,

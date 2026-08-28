@@ -89,6 +89,8 @@ connected.
 
 See **[examples/USAGE.md](examples/USAGE.md)** for a step-by-step walkthrough —
 first-run check, adding to a folder, safe deduplication, and batch reorganization.
+[`tools/classify.py`](tools/classify.py) writes a starter plan TSV for
+`apply_moves`; it moves nothing.
 
 `remove_duplicates`, `remove_empty_folders`, and `apply_moves` accept a `dry_run`
 flag; `remove_bookmark` does not. Export first for a backup.

@@ -17,7 +17,9 @@ Claude calls `bookmarks_status`. Connected looks like:
 ```
 
 If it comes back `connected: false`, the response includes a `fix` list — follow
-those steps (open Chrome, load the extension unpacked) and ask again.
+those steps and ask again. That is usually open Chrome and load the extension
+unpacked, but `connected: false` can also be a bind failure (EADDRINUSE — another
+server already on the port); follow the `fix` list the tool returns.
 
 ## 2. Get the lay of the land
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Propose a folder for every bookmark under "Other Bookmarks", by title + domain.
+"""Propose a folder for every bookmark under "Other bookmarks", by title + domain.
 
 This is a STARTER classifier with neutral, well-known-domain rules. It is meant
 to be tuned to your own collection — drop a `classify.rules.json` next to this
@@ -124,7 +124,7 @@ def host(u):
 def classify(title, url, folder):
     t = (title or "").lower(); h = host(url)
     if is_junk(title, h): return "JUNK", "", "junk"
-    if not re.search(r"Unsorted$", folder) and folder != "Other Bookmarks":
+    if not re.search(r"Unsorted$", folder) and folder != "Other bookmarks":
         for rx, (tp, sb) in FOLDER_RULES:
             if re.search(rx, folder): return tp, sb, "folder"
     for dom, (tp, sb) in D.items():
@@ -141,12 +141,12 @@ def main():
             p = path + "/" + (c.get("name") or "")
             if c.get("type") == "url":
                 tp, sb, how = classify(c.get("name"), c.get("url"), path)
-                dest = "DELETE?" if tp == "JUNK" else f"Other Bookmarks/{tp}" + (f"/{sb}" if sb else "")
+                dest = "DELETE?" if tp == "JUNK" else f"Other bookmarks/{tp}" + (f"/{sb}" if sb else "")
                 rows.append({"id": c["id"], "dest": dest, "cur": path, "how": how,
                              "title": c.get("name", ""), "url": c.get("url", "")})
             else:
                 walk(c, p)
-    walk(other, "Other Bookmarks")
+    walk(other, "Other bookmarks")
 
     with open(OUT, "w", newline="") as fh:
         w = csv.writer(fh, delimiter="\t"); w.writerow(["id", "proposed", "current", "via", "title", "url"])

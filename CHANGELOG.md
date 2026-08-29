@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.3]
+
+### Changed
+- Tool descriptions for `import_json` and `apply_moves` now state that a folder
+  path's top level must be a permanent root (`Bookmarks bar`, `Other bookmarks`,
+  or `Mobile bookmarks`) — the same rule `add_bookmark`, `create_folder`,
+  `move_bookmark`, and `ensure_folder_path` already named. `apply_moves` notes
+  the exception for the literal `DELETE?` when `delete_junk` is used. Helps the
+  driving model target folders correctly on the first try.
+
 ## [1.1.2]
 
 ### Changed

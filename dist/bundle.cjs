@@ -24905,7 +24905,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.3" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.4" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24968,7 +24968,7 @@ server.tool(
 );
 server.tool(
   "search_bookmarks",
-  "Search bookmarks by text in title or URL.",
+  "Search bookmarks by text in title or URL. Each hit includes its folder path.",
   { query: external_exports.string().describe("text to match in title or URL") },
   async ({ query }) => ok(await bridge.call("search", { query }))
 );

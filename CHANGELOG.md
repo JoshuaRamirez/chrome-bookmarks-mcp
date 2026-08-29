@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.4]
+
+### Changed
+- Tool description for `search_bookmarks` now states that each hit includes its
+  folder path — the same fact `examples/USAGE.md` already states. Helps the
+  driving model use the path on results without a follow-up lookup.
+
 ## [1.1.3]
 
 ### Changed

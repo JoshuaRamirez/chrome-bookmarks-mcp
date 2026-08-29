@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.3" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.4" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -110,7 +110,7 @@ server.tool("list_folders",
   async () => ok(await bridge.call("list_folders")));
 
 server.tool("search_bookmarks",
-  "Search bookmarks by text in title or URL.",
+  "Search bookmarks by text in title or URL. Each hit includes its folder path.",
   { query: z.string().describe("text to match in title or URL") },
   async ({ query }) => ok(await bridge.call("search", { query })));
 

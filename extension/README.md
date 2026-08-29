@@ -34,7 +34,7 @@ toolbar icon → **Open full manager →**.
 | Export JSON | Download the whole tree as portable JSON (your backup) |
 | Import JSON | Recreate an exported tree under any chosen folder |
 
-Permanent roots (Bookmarks bar, Other bookmarks, Mobile) cannot be renamed,
+Permanent roots (Bookmarks bar, Other bookmarks, Mobile bookmarks) cannot be renamed,
 moved, or deleted — only their contents.
 
 ## Architecture

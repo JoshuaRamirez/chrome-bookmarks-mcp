@@ -58,11 +58,12 @@ existing UI builds nodes explicitly.
 
 ## Versioning and release
 
-SemVer. A user-facing change bumps the patch/minor in **three** places, kept in
+SemVer. A user-facing change bumps the patch/minor in **four** places, kept in
 lockstep:
 - `package.json`
 - `.claude-plugin/plugin.json`
 - the `McpServer({ version })` string in `src/server.js`
+- `CHANGELOG.md` (new `[x.y.z]` section)
 
 Docs-only changes do not bump the version. Publishing to the RedJay marketplace
 is a separate step (update its `marketplace.json` entry to the new version).

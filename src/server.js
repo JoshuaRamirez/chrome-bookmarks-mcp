@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.2" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.3" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -205,7 +205,7 @@ server.tool("export_json",
   });
 
 server.tool("import_json",
-  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id.",
+  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id. An into_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { file_path: z.string(), into_path: z.string().optional(), into_parent_id: z.string().optional() },
   async ({ file_path, into_path, into_parent_id }) => {
     let data;
@@ -221,7 +221,7 @@ server.tool("import_json",
   });
 
 server.tool("apply_moves",
-  "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'.",
+  "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'. Each proposed folder path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks' (except the literal 'DELETE?' when delete_junk is used).",
   { file_path: z.string().optional(), dry_run: z.boolean().optional(), delete_junk: z.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
     const path = file_path || PLAN_DEFAULT;

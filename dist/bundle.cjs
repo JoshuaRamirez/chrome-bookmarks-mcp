@@ -24905,7 +24905,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.2" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.3" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -25083,7 +25083,7 @@ server.tool(
 );
 server.tool(
   "import_json",
-  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id.",
+  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id. An into_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { file_path: external_exports.string(), into_path: external_exports.string().optional(), into_parent_id: external_exports.string().optional() },
   async ({ file_path, into_path, into_parent_id }) => {
     let data;
@@ -25100,7 +25100,7 @@ server.tool(
 );
 server.tool(
   "apply_moves",
-  "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'.",
+  "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'. Each proposed folder path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks' (except the literal 'DELETE?' when delete_junk is used).",
   { file_path: external_exports.string().optional(), dry_run: external_exports.boolean().optional(), delete_junk: external_exports.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
     const path = file_path || PLAN_DEFAULT;

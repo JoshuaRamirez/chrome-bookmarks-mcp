@@ -30,7 +30,7 @@ Claude calls `stats` and `list_folders`:
 ```
 
 `list_folders` returns each folder with its `id`, `depth`, and full `path`
-(e.g. `Other Bookmarks / Dev / Web / React`) — the `path` is what you pass to
+(e.g. `Other bookmarks / Dev / Web / React`) — the `path` is what you pass to
 folder-targeting tools.
 
 ## 3. Add a bookmark to a specific folder

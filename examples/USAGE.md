@@ -67,14 +67,17 @@ Large moves are worth doing deliberately:
    > **You:** Export all my bookmarks to ~/bookmarks-backup.json
    Claude calls `export_json` with that `file_path`. To restore later, ask Claude
    to import it — `import_json` recreates that tree under a folder you choose
-   (default `Other bookmarks`).
+   (default `Other bookmarks`). An `into_path`'s top level must be one of
+   `Bookmarks bar`, `Other bookmarks`, or `Mobile bookmarks`.
 
 2. **Preview the moves.** `apply_moves` reads a tab-separated plan with columns
    `id, proposed, current, via, title, url` — one row per bookmark, where
    `proposed` is the destination folder path (or the literal `DELETE?` to drop a
-   row when `delete_junk: true`). Only `id` and `proposed` drive the action; the
-   rest is human context. See **[sample-plan.tsv](sample-plan.tsv)** for a
-   working example.
+   row when `delete_junk: true`). Each proposed folder path's top level must be
+   one of `Bookmarks bar`, `Other bookmarks`, or `Mobile bookmarks` (except the
+   literal `DELETE?` when `delete_junk` is used). Only `id` and `proposed` drive
+   the action; the rest is human context. See **[sample-plan.tsv](sample-plan.tsv)**
+   for a working example.
 
    **[`tools/classify.py`](../tools/classify.py)** is the starter plan generator:
    it reads Chrome's AccountBookmarks and writes a TSV with those columns — it

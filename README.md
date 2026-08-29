@@ -135,7 +135,8 @@ is committed, so any `src/` change must be rebuilt and committed (CI enforces th
 ## Privacy
 
 No network access beyond the localhost bridge. Bookmarks never leave your
-machine; the extension talks only to `127.0.0.1`.
+machine; the extension talks only to `127.0.0.1`. See
+**[SECURITY.md](SECURITY.md)** for the threat model.
 
 ## License
 

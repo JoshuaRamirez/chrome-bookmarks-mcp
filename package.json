@@ -27,7 +27,8 @@
     "examples",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "SECURITY.md"
   ],
   "scripts": {
     "build": "esbuild src/server.js --bundle --platform=node --format=cjs --target=node18 --outfile=dist/bundle.cjs --external:bufferutil --external:utf-8-validate",

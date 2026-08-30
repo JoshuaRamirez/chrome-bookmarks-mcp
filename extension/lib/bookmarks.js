@@ -25,9 +25,11 @@ class BookmarkStore {
 
   // Like search(), but each hit carries its containing folder path — the context
   // callers actually want ("where is this bookmark?"). chrome.bookmarks.search
-  // returns only parentId, so we resolve every folder's path once and join.
+  // returns folders (no url) as well as bookmarks; we keep only url hits — the
+  // same filter listBookmarks / findDuplicates / the manager UI already apply.
+  // Search returns only parentId, so we resolve every folder's path once and join.
   static async searchWithPaths(query) {
-    const hits = await chrome.bookmarks.search(query);
+    const hits = (await chrome.bookmarks.search(query)).filter(h => h.url);
     if (!hits.length) return [];
     const folderPath = new Map(); // folder id -> "A / B / C" (including itself)
     await BookmarkStore.walk((node, _p, _d, path) => {

@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.7]
+
+### Fixed
+- `search_bookmarks` / `searchWithPaths` no longer returns folder nodes (no
+  `url`) from `chrome.bookmarks.search`. Hits stay title/URL bookmarks with
+  folder path — the same filter `listBookmarks`, `findDuplicates`, and the
+  manager UI already apply.
+
 ## [1.1.6]
 
 ### Fixed

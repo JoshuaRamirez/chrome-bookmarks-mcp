@@ -56,9 +56,13 @@ globalThis.chrome = {
     async getSubTree(id) { return [byId(id)]; },
     async getChildren(id) { return (byId(id).children || []).map((c) => c); },
     async search(query) {
+      // Match chrome.bookmarks.search: title or URL, including folder nodes (no url).
       const q = String(query).toLowerCase();
-      return ALL.filter((n) => n.url && ((n.title || "").toLowerCase().includes(q) || n.url.toLowerCase().includes(q)))
-        .map((n) => ({ id: n.id, title: n.title, url: n.url, parentId: n.parentId }));
+      return ALL.filter((n) => {
+        const titleHit = (n.title || "").toLowerCase().includes(q);
+        const urlHit = n.url && n.url.toLowerCase().includes(q);
+        return titleHit || urlHit;
+      }).map((n) => ({ id: n.id, title: n.title, url: n.url, parentId: n.parentId }));
     },
     // Minimal create: record the node and hand back a fresh id (importInto needs
     // the returned id to nest children under a newly-created folder).
@@ -99,6 +103,22 @@ const r201 = results.find((r) => r.id === "201");
 check("searchWithPaths attaches folder context",
   results.length === 2 && r102?.folder === "Bookmarks bar" && r201?.folder === "Other bookmarks",
   JSON.stringify(results));
+
+// chrome.bookmarks.search returns folder Dev(10) for "Dev" plus React (url
+// contains "dev"). Folder rows must be omitted; bookmark hits keep their path.
+const rawDev = await chrome.bookmarks.search("Dev");
+check("mock search returns folder hits like chrome.bookmarks.search",
+  rawDev.some((n) => n.id === "10" && !n.url) && rawDev.some((n) => n.id === "101"),
+  JSON.stringify(rawDev));
+const devHits = await BookmarkStore.searchWithPaths("Dev");
+const folderHit = devHits.find((r) => r.id === "10");
+const reactHit = devHits.find((r) => r.id === "101");
+check("searchWithPaths omits folder hits and keeps bookmark folder path",
+  !folderHit &&
+  devHits.every((r) => r.url) &&
+  reactHit?.url === "https://react.dev" &&
+  reactHit?.folder === "Bookmarks bar / Dev",
+  JSON.stringify(devHits));
 
 const all = await BookmarkStore.listBookmarks();
 check("listBookmarks returns a flat list of all bookmarks with folders",

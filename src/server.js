@@ -54,20 +54,20 @@ const splitPath = (p) => String(p || "").split("/").map(s => s.trim()).filter(Bo
 // Exact match after lowercasing and collapsing whitespace — keep in lockstep
 // with permanentRootAlias in extension/bridge.js. Substring tests falsely
 // accept Sidebar / Mother / Automobile (they contain bar / other / mobile).
-const PERMANENT_ROOT_ALIASES = {
-  bar: ["bookmarks-bar", "1"],
-  toolbar: ["bookmarks-bar", "1"],
-  "bookmarks bar": ["bookmarks-bar", "1"],
-  "bookmarks-bar": ["bookmarks-bar", "1"],
-  other: ["other", "2"],
-  "other bookmarks": ["other", "2"],
-  mobile: ["mobile", "3"],
-  "mobile bookmarks": ["mobile", "3"],
-};
+const PERMANENT_ROOT_ALIASES = new Map([
+  ["bar", ["bookmarks-bar", "1"]],
+  ["toolbar", ["bookmarks-bar", "1"]],
+  ["bookmarks bar", ["bookmarks-bar", "1"]],
+  ["bookmarks-bar", ["bookmarks-bar", "1"]],
+  ["other", ["other", "2"]],
+  ["other bookmarks", ["other", "2"]],
+  ["mobile", ["mobile", "3"]],
+  ["mobile bookmarks", ["mobile", "3"]],
+]);
 
 function permanentRootAlias(segment) {
   const key = String(segment || "").toLowerCase().replace(/\s+/g, " ").trim();
-  return PERMANENT_ROOT_ALIASES[key] || null;
+  return PERMANENT_ROOT_ALIASES.get(key) || null;
 }
 
 // Mirror ensurePath's first-segment rule (extension/bridge.js) without Chrome:

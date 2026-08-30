@@ -24910,19 +24910,19 @@ var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
 var splitPath = (p) => String(p || "").split("/").map((s) => s.trim()).filter(Boolean);
-var PERMANENT_ROOT_ALIASES = {
-  bar: ["bookmarks-bar", "1"],
-  toolbar: ["bookmarks-bar", "1"],
-  "bookmarks bar": ["bookmarks-bar", "1"],
-  "bookmarks-bar": ["bookmarks-bar", "1"],
-  other: ["other", "2"],
-  "other bookmarks": ["other", "2"],
-  mobile: ["mobile", "3"],
-  "mobile bookmarks": ["mobile", "3"]
-};
+var PERMANENT_ROOT_ALIASES = /* @__PURE__ */ new Map([
+  ["bar", ["bookmarks-bar", "1"]],
+  ["toolbar", ["bookmarks-bar", "1"]],
+  ["bookmarks bar", ["bookmarks-bar", "1"]],
+  ["bookmarks-bar", ["bookmarks-bar", "1"]],
+  ["other", ["other", "2"]],
+  ["other bookmarks", ["other", "2"]],
+  ["mobile", ["mobile", "3"]],
+  ["mobile bookmarks", ["mobile", "3"]]
+]);
 function permanentRootAlias(segment) {
   const key = String(segment || "").toLowerCase().replace(/\s+/g, " ").trim();
-  return PERMANENT_ROOT_ALIASES[key] || null;
+  return PERMANENT_ROOT_ALIASES.get(key) || null;
 }
 function assertPermanentRoot(segments) {
   if (!segments.length) throw new Error("empty path");

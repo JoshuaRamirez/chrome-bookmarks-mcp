@@ -10,7 +10,8 @@ All notable changes to this project are documented here. Format loosely follows
   `mobile`. `Sidebar/Dev`, `Mother/Kids`, and `Automobile/Cars` are rejected
   the same way as `Work/…` (`top-level folder "…" not found`). Short aliases
   (`bar`, `toolbar`, `other`, `mobile`) and the full root names still work.
-  `apply_moves` dry_run and live `ensurePath` stay on the same allowlist.
+  `apply_moves` dry_run and live `ensurePath` stay on the same allowlist
+  (`Map`, so `constructor` / `toString` / `__proto__` are not aliases).
 
 ## [1.1.5]
 

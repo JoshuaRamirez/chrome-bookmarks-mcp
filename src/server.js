@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.4" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.5" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -288,13 +288,21 @@ server.tool("remove_empty_folders",
   async ({ dry_run }) => {
     const [root] = await bridge.call("get_tree");
     const removed = [];
+    const gone = new Set(); // ids already listed (and, on apply, deleted)
     async function visit(node, isPermanent) {
       for (const ch of (node.children || []).filter(c => !c.url)) await visit(ch, false);
       if (!isPermanent) {
         const fresh = (await bridge.call("get_tree"))[0];
         const found = findById(fresh, node.id);
-        if (found && (!found.children || found.children.length === 0)) {
+        // Live apply deletes empty children before this re-read, so the parent
+        // looks empty. dry_run never calls remove, so get_tree still shows those
+        // children — treat already-listed empty ids as gone so the cascade matches.
+        const remaining = found
+          ? (found.children || []).filter(c => !gone.has(c.id))
+          : [];
+        if (found && remaining.length === 0) {
           removed.push({ id: node.id, title: node.title });
+          gone.add(node.id);
           if (!dry_run) await bridge.call("remove", { id: node.id, recursive: true });
         }
       }

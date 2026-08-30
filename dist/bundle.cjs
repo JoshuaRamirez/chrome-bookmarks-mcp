@@ -24905,7 +24905,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.4" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.5" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -25174,13 +25174,16 @@ server.tool(
   async ({ dry_run }) => {
     const [root] = await bridge.call("get_tree");
     const removed = [];
+    const gone = /* @__PURE__ */ new Set();
     async function visit(node, isPermanent) {
       for (const ch of (node.children || []).filter((c) => !c.url)) await visit(ch, false);
       if (!isPermanent) {
         const fresh = (await bridge.call("get_tree"))[0];
         const found = findById(fresh, node.id);
-        if (found && (!found.children || found.children.length === 0)) {
+        const remaining = found ? (found.children || []).filter((c) => !gone.has(c.id)) : [];
+        if (found && remaining.length === 0) {
           removed.push({ id: node.id, title: node.title });
+          gone.add(node.id);
           if (!dry_run) await bridge.call("remove", { id: node.id, recursive: true });
         }
       }

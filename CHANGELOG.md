@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.5]
+
+### Fixed
+- `remove_empty_folders` dry_run now reports the same cascade live apply would
+  delete: after an empty child is listed, its parent is treated as empty too
+  (instead of trusting a fresh `get_tree` that still contains those children).
+  dry_run still does not call `remove`. Permanent roots stay skipped; folders
+  that contain bookmarks (or non-empty folders) are not listed.
+
 ## [1.1.4]
 
 ### Fixed

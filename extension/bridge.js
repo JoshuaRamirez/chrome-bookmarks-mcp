@@ -79,11 +79,14 @@ async function ensurePath(segments) {
   if (!segments.length) throw new Error("empty path");
   const [root] = await chrome.bookmarks.getTree();
   const roots = root.children || [];
-  const first = segments[0].toLowerCase();
   const alias = permanentRootAlias(segments[0]);
-  let cur = alias
-    ? (roots.find(r => r.folderType === alias[0]) || roots.find(r => r.id === alias[1]))
-    : roots.find(r => (r.title || "").toLowerCase() === first);
+  // Same first-segment rule as assertPermanentRoot (src/server.js): allowlist
+  // hit → folderType / id lookup. No title-match fallback — a miss must not
+  // succeed live (e.g. a localized root title) when dry_run rejects.
+  if (!alias) {
+    throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
+  }
+  let cur = roots.find(r => r.folderType === alias[0]) || roots.find(r => r.id === alias[1]);
   if (!cur) throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
   for (let i = 1; i < segments.length; i++) {
     const seg = segments[i];

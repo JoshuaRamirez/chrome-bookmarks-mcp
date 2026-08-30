@@ -3,15 +3,20 @@
 // reports the happy-path counts. Dry-run over a temp TSV with a non-root
 // destination (an empty path, or a substring false-positive like Sidebar)
 // must fail those rows, not count them as moved. The handler never calls
-// the bridge in these cases, so no browser.
+// the bridge in these cases, so no browser. Live ensurePath (extension/bridge.js)
+// is loaded in-process against a mock chrome.bookmarks tree and must reject
+// the same allowlist misses — including a first segment that equals a
+// localized root title — so dry_run and live stay on the same rule.
 //
 // Run: node test/apply-moves.mjs   (invoked by `npm test`)
 
 import { spawn } from "node:child_process";
 import { writeFile, mkdtemp, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import vm from "node:vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE = join(__dirname, "..", "dist", "bundle.cjs");
@@ -101,6 +106,62 @@ check("apply_moves — dry-run rejects invalid destinations (not counted as move
   msgs.some((m) => /top-level folder "constructor" not found/.test(m)) &&
   msgs.some((m) => m === "empty path"),
   JSON.stringify(bogus));
+
+// 4. Live ensurePath uses the same allowlist as dry_run — no title-match
+//    fallback. Localized root titles would have matched `r.title`; they must
+//    still throw. Allowlisted aliases still resolve via folderType / id.
+const LIVE_TREE = {
+  id: "0", title: "", children: [
+    { id: "1", title: "Barra de marcadores", folderType: "bookmarks-bar", parentId: "0", children: [] },
+    { id: "2", title: "Otros marcadores", folderType: "other", parentId: "0", children: [] },
+    { id: "3", title: "Marcadores del móvil", folderType: "mobile", parentId: "0", children: [] },
+  ],
+};
+globalThis.chrome = {
+  bookmarks: {
+    async getTree() { return [LIVE_TREE]; },
+  },
+};
+vm.runInThisContext(
+  readFileSync(join(__dirname, "..", "extension", "bridge.js"), "utf8") +
+  "\nglobalThis.ensurePath = ensurePath;\n"
+);
+
+const notFound = (seg) =>
+  `top-level folder "${seg}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`;
+
+async function ensureRejects(name, segments, expected) {
+  let err = "";
+  try { await globalThis.ensurePath(segments); }
+  catch (e) { err = e.message; }
+  check(name, err === expected, err || "(succeeded)");
+}
+
+const bar = await globalThis.ensurePath(["Bookmarks bar"]);
+check("ensurePath — allowlisted 'Bookmarks bar' resolves via folderType/id (not title)",
+  bar && bar.id === "1",
+  JSON.stringify(bar));
+const viaBar = await globalThis.ensurePath(["bar"]);
+check("ensurePath — short alias 'bar' still hits Bookmarks bar",
+  viaBar && viaBar.id === "1",
+  JSON.stringify(viaBar));
+const viaOther = await globalThis.ensurePath(["other"]);
+check("ensurePath — short alias 'other' still hits Other bookmarks",
+  viaOther && viaOther.id === "2",
+  JSON.stringify(viaOther));
+
+await ensureRejects("ensurePath — localized title that would title-match is rejected",
+  ["Barra de marcadores"], notFound("Barra de marcadores"));
+await ensureRejects("ensurePath — live rejects Work (same as dry_run)",
+  ["Work", "Projects"], notFound("Work"));
+await ensureRejects("ensurePath — live rejects Sidebar (same as dry_run)",
+  ["Sidebar", "Dev"], notFound("Sidebar"));
+await ensureRejects("ensurePath — live rejects Mother (same as dry_run)",
+  ["Mother", "Kids"], notFound("Mother"));
+await ensureRejects("ensurePath — live rejects Automobile (same as dry_run)",
+  ["Automobile", "Cars"], notFound("Automobile"));
+await ensureRejects("ensurePath — live rejects constructor (same as dry_run)",
+  ["constructor", "Dev"], notFound("constructor"));
 
 console.log(exitCode ? "APPLY-MOVES TEST FAILED" : "APPLY-MOVES TEST PASSED");
 process.exit(exitCode);

@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.7]
+
+### Fixed
+- Live `ensurePath` no longer title-matches a first segment that misses the
+  permanent-root allowlist. Localized (or otherwise title-equal) roots that
+  are not in the Map now throw the same `top-level folder "…" not found`
+  error as `apply_moves` dry_run. Allowlisted aliases still resolve by
+  `folderType` / id.
+
 ## [1.1.6]
 
 ### Fixed

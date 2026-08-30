@@ -24,14 +24,15 @@ the port; the extension dials it. See the README for the data-flow diagram.
 ```
 npm install
 npm run build      # esbuild src/server.js → dist/bundle.cjs
-npm test           # four Node suites: protocol, diagnostics, BookmarkStore, apply_moves
+npm test           # five Node suites: protocol, diagnostics, BookmarkStore, apply_moves, remove_empty_folders
 ```
 
-`npm test` runs four suites, none of which need Chrome:
+`npm test` runs five suites, none of which need Chrome:
 - `test/smoke.mjs` — handshake, all 17 tools present, disconnected-state guidance.
 - `test/port-conflict.mjs` — a second server on a taken port reports EADDRINUSE.
 - `test/bookmarkstore.mjs` — BookmarkStore against a mock `chrome.bookmarks` tree.
 - `test/apply-moves.mjs` — missing-plan-file message, a dry-run over `examples/sample-plan.tsv`, and a dry-run over a temp TSV with an invalid destination.
+- `test/remove-empty-folders.mjs` — dry_run lists nested empty parents and empty leaves (without calling remove); live apply deletes the same ids.
 
 ## The one rule CI enforces: rebuild the bundle
 

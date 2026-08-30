@@ -24905,16 +24905,28 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.5" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.6" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
 var splitPath = (p) => String(p || "").split("/").map((s) => s.trim()).filter(Boolean);
+var PERMANENT_ROOT_ALIASES = /* @__PURE__ */ new Map([
+  ["bar", ["bookmarks-bar", "1"]],
+  ["toolbar", ["bookmarks-bar", "1"]],
+  ["bookmarks bar", ["bookmarks-bar", "1"]],
+  ["bookmarks-bar", ["bookmarks-bar", "1"]],
+  ["other", ["other", "2"]],
+  ["other bookmarks", ["other", "2"]],
+  ["mobile", ["mobile", "3"]],
+  ["mobile bookmarks", ["mobile", "3"]]
+]);
+function permanentRootAlias(segment) {
+  const key = String(segment || "").toLowerCase().replace(/\s+/g, " ").trim();
+  return PERMANENT_ROOT_ALIASES.get(key) || null;
+}
 function assertPermanentRoot(segments) {
   if (!segments.length) throw new Error("empty path");
-  const first = segments[0].toLowerCase();
-  const alias = /bar|toolbar/.test(first) ? ["bookmarks-bar", "1"] : /other/.test(first) ? ["other", "2"] : /mobile/.test(first) ? ["mobile", "3"] : null;
-  if (!alias) {
+  if (!permanentRootAlias(segments[0])) {
     throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
   }
 }

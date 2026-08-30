@@ -1,8 +1,9 @@
 // Robustness test: apply_moves against a missing plan file must return a clear,
 // actionable message (not a raw ENOENT). Dry-run over the sample plan still
 // reports the happy-path counts. Dry-run over a temp TSV with a non-root
-// destination (and an empty path) must fail those rows, not count them as
-// moved. The handler never calls the bridge in these cases, so no browser.
+// destination (an empty path, or a substring false-positive like Sidebar)
+// must fail those rows, not count them as moved. The handler never calls
+// the bridge in these cases, so no browser.
 //
 // Run: node test/apply-moves.mjs   (invoked by `npm test`)
 
@@ -25,6 +26,10 @@ await writeFile(BOGUS, [
   "2\t///\tBookmarks bar\ttitle-match\tEmpty path\thttps://example.com/b",
   "3\tDELETE?\tOther bookmarks\tdead-link\tJunk\thttp://dead.example",
   "4\tbar/Dev\tBookmarks bar\ttitle-match\tAlias still ok\thttps://example.com/d",
+  "5\tSidebar/Dev\tBookmarks bar\ttitle-match\tFalse-positive bar\thttps://example.com/e",
+  "6\tMother/Kids\tBookmarks bar\ttitle-match\tFalse-positive other\thttps://example.com/f",
+  "7\tAutomobile/Cars\tBookmarks bar\ttitle-match\tFalse-positive mobile\thttps://example.com/g",
+  "8\tconstructor/Dev\tBookmarks bar\ttitle-match\tPrototype key\thttps://example.com/h",
 ].join("\n") + "\n");
 
 const child = spawn("node", [BUNDLE], {
@@ -79,15 +84,21 @@ check("apply_moves — dry-run over sample plan counts moves/skips/folders",
   JSON.stringify(summary));
 
 // 3. Dry-run over a bogus plan: invalid top level + empty path are errors,
-//    DELETE? is still skipped, and a bar/ alias is still a successful move.
+//    substring false-positives (Sidebar/Mother/Automobile) are errors too,
+//    Object.prototype keys (constructor) are errors, DELETE? is still
+//    skipped, and a bar/ alias is still a successful move.
 let bogus;
 try { bogus = JSON.parse(textOf(responses.get(6))); } catch { bogus = null; }
 const details = bogus?.error_detail || [];
 const msgs = details.map((e) => e.error || "");
 check("apply_moves — dry-run rejects invalid destinations (not counted as moved)",
   bogus && bogus.dry_run === true && bogus.moved === 1 && bogus.skipped === 1 &&
-  bogus.errors === 2 && bogus.distinct_target_folders === 1 &&
+  bogus.errors === 6 && bogus.distinct_target_folders === 1 &&
   msgs.some((m) => /top-level folder "Work" not found/.test(m)) &&
+  msgs.some((m) => /top-level folder "Sidebar" not found/.test(m)) &&
+  msgs.some((m) => /top-level folder "Mother" not found/.test(m)) &&
+  msgs.some((m) => /top-level folder "Automobile" not found/.test(m)) &&
+  msgs.some((m) => /top-level folder "constructor" not found/.test(m)) &&
   msgs.some((m) => m === "empty path"),
   JSON.stringify(bogus));
 

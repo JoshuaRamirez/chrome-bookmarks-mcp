@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.6]
+
+### Fixed
+- Permanent-root detection no longer substring-matches `bar` / `other` /
+  `mobile`. `Sidebar/Dev`, `Mother/Kids`, and `Automobile/Cars` are rejected
+  the same way as `Work/…` (`top-level folder "…" not found`). Short aliases
+  (`bar`, `toolbar`, `other`, `mobile`) and the full root names still work.
+  `apply_moves` dry_run and live `ensurePath` stay on the same allowlist.
+
 ## [1.1.5]
 
 ### Fixed

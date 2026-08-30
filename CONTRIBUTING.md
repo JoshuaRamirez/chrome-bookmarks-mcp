@@ -31,7 +31,7 @@ npm test           # four Node suites: protocol, diagnostics, BookmarkStore, app
 - `test/smoke.mjs` — handshake, all 17 tools present, disconnected-state guidance.
 - `test/port-conflict.mjs` — a second server on a taken port reports EADDRINUSE.
 - `test/bookmarkstore.mjs` — BookmarkStore against a mock `chrome.bookmarks` tree.
-- `test/apply-moves.mjs` — missing-plan-file message and a dry-run over `examples/sample-plan.tsv`.
+- `test/apply-moves.mjs` — missing-plan-file message, a dry-run over `examples/sample-plan.tsv`, and a dry-run over a temp TSV with an invalid destination.
 
 ## The one rule CI enforces: rebuild the bundle
 

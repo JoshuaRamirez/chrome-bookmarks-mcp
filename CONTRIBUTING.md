@@ -58,9 +58,10 @@ existing UI builds nodes explicitly.
 
 ## Versioning and release
 
-SemVer. A user-facing change bumps the patch/minor in **four** places, kept in
+SemVer. A user-facing change bumps the patch/minor in **five** places, kept in
 lockstep:
 - `package.json`
+- `package-lock.json` (root `version` and `packages[""].version`)
 - `.claude-plugin/plugin.json`
 - the `McpServer({ version })` string in `src/server.js`
 - `CHANGELOG.md` (new `[x.y.z]` section)

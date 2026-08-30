@@ -19,6 +19,25 @@ jobs:
       - name: Install (locked)
         run: npm ci
 
+      - name: Verify lockfile version matches package.json
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            const pkgVer = pkg.version;
+            const lockRoot = lock.version;
+            const lockPkg = lock.packages?.[""]?.version;
+            if (pkgVer !== lockRoot || pkgVer !== lockPkg) {
+              console.error("::error::package-lock.json version drifted from package.json.");
+              console.error("  package.json version:        " + pkgVer);
+              console.error("  package-lock.json version:   " + lockRoot);
+              console.error("  packages[\"\"].version:        " + lockPkg);
+              process.exit(1);
+            }
+            console.log("lockfile version matches package.json (" + pkgVer + ")");
+          '
+
       - name: Build bundle
         run: npm run build
 

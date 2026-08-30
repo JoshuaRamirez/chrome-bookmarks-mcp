@@ -24905,11 +24905,19 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.3" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.4" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
 var splitPath = (p) => String(p || "").split("/").map((s) => s.trim()).filter(Boolean);
+function assertPermanentRoot(segments) {
+  if (!segments.length) throw new Error("empty path");
+  const first = segments[0].toLowerCase();
+  const alias = /bar|toolbar/.test(first) ? ["bookmarks-bar", "1"] : /other/.test(first) ? ["other", "2"] : /mobile/.test(first) ? ["mobile", "3"] : null;
+  if (!alias) {
+    throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
+  }
+}
 async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
   if (parent_id) return parent_id;
   const folder = await bridge.call("ensure_path", { path: splitPath(path || fallback) });
@@ -25132,9 +25140,12 @@ server.tool(
           continue;
         }
         if (!folderId.has(proposed)) {
-          if (dry_run) folderId.set(proposed, "(dry)");
-          else {
-            const f = await bridge.call("ensure_path", { path: proposed.split("/").map((s) => s.trim()).filter(Boolean) });
+          const segments = proposed.split("/").map((s) => s.trim()).filter(Boolean);
+          if (dry_run) {
+            assertPermanentRoot(segments);
+            folderId.set(proposed, "(dry)");
+          } else {
+            const f = await bridge.call("ensure_path", { path: segments });
             folderId.set(proposed, f.id);
           }
         }

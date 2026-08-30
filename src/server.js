@@ -42,13 +42,27 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.3" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.4" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
 const splitPath = (p) => String(p || "").split("/").map(s => s.trim()).filter(Boolean);
+
+// Mirror ensurePath's first-segment rule (extension/bridge.js) without Chrome:
+// empty path is invalid; otherwise the top level must alias a permanent root
+// (bar/toolbar, other, mobile). Live apply still calls ensure_path.
+function assertPermanentRoot(segments) {
+  if (!segments.length) throw new Error("empty path");
+  const first = segments[0].toLowerCase();
+  const alias = /bar|toolbar/.test(first) ? ["bookmarks-bar", "1"]
+              : /other/.test(first) ? ["other", "2"]
+              : /mobile/.test(first) ? ["mobile", "3"] : null;
+  if (!alias) {
+    throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
+  }
+}
 
 // Resolve a folder target to an id: prefer parent_id, else ensure the path.
 async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
@@ -251,9 +265,12 @@ server.tool("apply_moves",
           continue;
         }
         if (!folderId.has(proposed)) {
-          if (dry_run) folderId.set(proposed, "(dry)");
-          else {
-            const f = await bridge.call("ensure_path", { path: proposed.split("/").map(s => s.trim()).filter(Boolean) });
+          const segments = proposed.split("/").map(s => s.trim()).filter(Boolean);
+          if (dry_run) {
+            assertPermanentRoot(segments);
+            folderId.set(proposed, "(dry)");
+          } else {
+            const f = await bridge.call("ensure_path", { path: segments });
             folderId.set(proposed, f.id);
           }
         }

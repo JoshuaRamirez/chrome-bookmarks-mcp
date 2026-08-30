@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.4]
+
+### Fixed
+- `apply_moves` dry_run now rejects proposed destinations whose top level is not
+  a permanent root (`Bookmarks bar` / `Other bookmarks` / `Mobile bookmarks`,
+  including the same bar/toolbar, other, mobile aliases as `ensurePath`) or
+  whose path is empty. Those rows are reported in `errors` and no longer
+  increment `moved`. Dry_run stays browser-free and does not create folders;
+  `DELETE?` skip / `delete_junk` is unchanged.
+
 ## [1.1.3]
 
 ### Changed

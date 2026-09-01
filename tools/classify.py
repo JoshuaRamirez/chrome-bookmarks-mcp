@@ -119,7 +119,9 @@ def load_user_rules():
 
 def host(u):
     try:
-        h = (urlparse(u).hostname or "").replace("www.", "").lower()
+        h = (urlparse(u).hostname or "").lower()
+        if h.startswith("www."):
+            h = h[4:]  # at most one leading www. label
         return h[:-1] if h.endswith(".") else h  # one trailing DNS root dot
     except Exception: return ""
 
@@ -169,12 +171,16 @@ def _self_check():
     # Real host + subdomain still classify via domain identity.
     expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"))
     expect("Docs", "https://docs.github.com/en", ("Dev", "GitHub", "domain"))
+    # Leading www. still strips; real hosts stay via=domain.
+    expect("GitHub", "https://www.github.com", ("Dev", "GitHub", "domain"))
+    expect("Amazon", "https://www.amazon.com", ("Shopping", "", "domain"))
     # FQDN with one trailing DNS root dot still matches.
     expect("GitHub", "https://github.com./x", ("Dev", "GitHub", "domain"))
     expect("Docs", "https://docs.github.com./en", ("Dev", "GitHub", "domain"))
-    # Substring / suffix-injection hosts must not.
+    # Substring / suffix-injection / middle-label www. hosts must not.
     for url in ("https://notgithub.com", "https://github.com.evil.com",
-                "https://myamazon.com", "https://xxbbc.com"):
+                "https://myamazon.com", "https://xxbbc.com",
+                "https://amazon.www.com", "https://docs.github.www.com"):
         via = classify("Bookmark", url, "Other bookmarks")[2]
         if via == "domain":
             raise AssertionError((url, via))

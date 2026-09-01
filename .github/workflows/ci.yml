@@ -25,17 +25,24 @@ jobs:
             const fs = require("fs");
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
             const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            const plugin = JSON.parse(fs.readFileSync(".claude-plugin/plugin.json", "utf8"));
+            const serverSrc = fs.readFileSync("src/server.js", "utf8");
             const pkgVer = pkg.version;
             const lockRoot = lock.version;
             const lockPkg = lock.packages?.[""]?.version;
-            if (pkgVer !== lockRoot || pkgVer !== lockPkg) {
-              console.error("::error::package-lock.json version drifted from package.json.");
-              console.error("  package.json version:        " + pkgVer);
-              console.error("  package-lock.json version:   " + lockRoot);
-              console.error("  packages[\"\"].version:        " + lockPkg);
+            const pluginVer = plugin.version;
+            const mcpMatch = serverSrc.match(/new McpServer\(\s*\{\s*name:\s*"chrome-bookmarks",\s*version:\s*"([^"]+)"/);
+            const mcpVer = mcpMatch && mcpMatch[1];
+            if (pkgVer !== lockRoot || pkgVer !== lockPkg || pkgVer !== pluginVer || pkgVer !== mcpVer) {
+              console.error("::error::Version lockstep drifted from package.json.");
+              console.error("  package.json version:              " + pkgVer);
+              console.error("  package-lock.json version:         " + lockRoot);
+              console.error("  packages[\"\"].version:              " + lockPkg);
+              console.error("  .claude-plugin/plugin.json:        " + pluginVer);
+              console.error("  src/server.js McpServer version:   " + (mcpVer || "(not found)"));
               process.exit(1);
             }
-            console.log("lockfile version matches package.json (" + pkgVer + ")");
+            console.log("version lockstep matches package.json (" + pkgVer + ")");
           '
 
       - name: Build bundle

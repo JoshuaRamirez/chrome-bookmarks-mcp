@@ -66,6 +66,8 @@ lockstep:
 - the `McpServer({ version })` string in `src/server.js`
 - `CHANGELOG.md` (new `[x.y.z]` section)
 
+CI asserts the first four match `package.json` (CHANGELOG stays a human check).
+
 Docs-only changes do not bump the version. Publishing to the RedJay marketplace
 is a separate step (update its `marketplace.json` entry to the new version).
 

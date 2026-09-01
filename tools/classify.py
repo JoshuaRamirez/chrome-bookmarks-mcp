@@ -118,7 +118,9 @@ def load_user_rules():
         FOLDER_RULES.insert(0, (rx, tuple(pair)))
 
 def host(u):
-    try: return (urlparse(u).hostname or "").replace("www.", "").lower()
+    try:
+        h = (urlparse(u).hostname or "").replace("www.", "").lower()
+        return h[:-1] if h.endswith(".") else h  # one trailing DNS root dot
     except Exception: return ""
 
 def classify(title, url, folder):
@@ -159,14 +161,23 @@ def main():
     for k, v in Counter(r["how"] for r in rows).most_common(): print(f"  {v:3d}  {k}")
 
 def _self_check():
+    # Explicit raises so python -O cannot skip the checks.
+    def expect(title, url, want):
+        got = classify(title, url, "Other bookmarks")
+        if got != want:
+            raise AssertionError((url, got, want))
     # Real host + subdomain still classify via domain identity.
-    assert classify("GitHub", "https://github.com", "Other bookmarks") == ("Dev", "GitHub", "domain")
-    assert classify("Docs", "https://docs.github.com/en", "Other bookmarks") == ("Dev", "GitHub", "domain")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"))
+    expect("Docs", "https://docs.github.com/en", ("Dev", "GitHub", "domain"))
+    # FQDN with one trailing DNS root dot still matches.
+    expect("GitHub", "https://github.com./x", ("Dev", "GitHub", "domain"))
+    expect("Docs", "https://docs.github.com./en", ("Dev", "GitHub", "domain"))
     # Substring / suffix-injection hosts must not.
     for url in ("https://notgithub.com", "https://github.com.evil.com",
                 "https://myamazon.com", "https://xxbbc.com"):
         via = classify("Bookmark", url, "Other bookmarks")[2]
-        assert via != "domain", (url, via)
+        if via == "domain":
+            raise AssertionError((url, via))
     print("classify self-check ok")
 
 if __name__ == "__main__":

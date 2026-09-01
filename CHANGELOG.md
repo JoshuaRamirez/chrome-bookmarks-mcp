@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.9]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` now rejects a provided `folder_path` that
+  normalizes to empty (`/`, `///`, whitespace-only) with `empty path`, matching
+  `ensurePath` and `apply_moves`. Omitting `folder_path` still lists everything.
+
 ## [1.1.8]
 
 ### Fixed

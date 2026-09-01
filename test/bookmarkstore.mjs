@@ -145,6 +145,26 @@ check("listBookmarks matches USAGE Other Bookmarks casing and keeps Chrome folde
   otherTitleCase.some((b) => b.id === "201" && b.folder === "Other bookmarks"),
   JSON.stringify(otherTitleCase));
 
+// A provided folderPath that normalizes to empty must throw — not list-all.
+// Sibling write tools (ensurePath / apply_moves) use the same "empty path"
+// message. Omit (listBookmarks() above) still lists everything.
+for (const raw of ["/", "///", "   "]) {
+  let threw = false;
+  let message = "";
+  let leaked = null;
+  try {
+    leaked = await BookmarkStore.listBookmarks(raw);
+  } catch (e) {
+    threw = true;
+    message = String(e?.message || e);
+  }
+  check(
+    `listBookmarks rejects empty-normalized folder_path ${JSON.stringify(raw)}`,
+    threw && /empty path/.test(message),
+    threw ? message : `returned ${leaked?.length} bookmarks (must not list-all)`
+  );
+}
+
 const exported = await BookmarkStore.exportTree();
 check("exportTree unwraps to permanent roots with children",
   Array.isArray(exported.children) && exported.children.some((c) => c.title === "Bookmarks bar"),

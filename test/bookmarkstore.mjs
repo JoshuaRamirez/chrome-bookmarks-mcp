@@ -130,6 +130,21 @@ check("listBookmarks scopes to a folder path and its subfolders",
   scoped.length === 2 && scoped.every((b) => b.folder === "Bookmarks bar / Dev"),
   JSON.stringify(scoped));
 
+const scopedLower = await BookmarkStore.listBookmarks("bookmarks bar/dev");
+check("listBookmarks matches folder_path case-insensitively and keeps Chrome folder casing",
+  scopedLower.length === 2 &&
+  scopedLower.every((b) => b.folder === "Bookmarks bar / Dev") &&
+  scopedLower.some((b) => b.id === "100") &&
+  scopedLower.some((b) => b.id === "101"),
+  JSON.stringify(scopedLower));
+
+const otherTitleCase = await BookmarkStore.listBookmarks("Other Bookmarks");
+check("listBookmarks matches USAGE Other Bookmarks casing and keeps Chrome folder casing",
+  otherTitleCase.length === 2 &&
+  otherTitleCase.some((b) => b.id === "200" && b.folder === "Other bookmarks / News") &&
+  otherTitleCase.some((b) => b.id === "201" && b.folder === "Other bookmarks"),
+  JSON.stringify(otherTitleCase));
+
 const exported = await BookmarkStore.exportTree();
 check("exportTree unwraps to permanent roots with children",
   Array.isArray(exported.children) && exported.children.some((c) => c.title === "Bookmarks bar"),

@@ -18,7 +18,7 @@ Env:
   BOOKMARKS_SRC   path to Chrome's AccountBookmarks (default: macOS Default profile)
   MOVES_OUT       output TSV path (default: ./proposed-moves.tsv)
 """
-import json, os, re, csv
+import json, os, re, csv, sys
 from urllib.parse import urlparse
 from collections import Counter
 
@@ -118,7 +118,9 @@ def load_user_rules():
         FOLDER_RULES.insert(0, (rx, tuple(pair)))
 
 def host(u):
-    try: return (urlparse(u).hostname or "").replace("www.", "").lower()
+    try:
+        h = (urlparse(u).hostname or "").replace("www.", "").lower()
+        return h[:-1] if h.endswith(".") else h  # one trailing DNS root dot
     except Exception: return ""
 
 def classify(title, url, folder):
@@ -128,7 +130,7 @@ def classify(title, url, folder):
         for rx, (tp, sb) in FOLDER_RULES:
             if re.search(rx, folder): return tp, sb, "folder"
     for dom, (tp, sb) in D.items():
-        if dom in h: return tp, sb, "domain"
+        if h == dom or h.endswith("." + dom): return tp, sb, "domain"
     for rx, (tp, sb) in KW:
         if re.search(rx, t): return tp, sb, "keyword"
     return "Reference", "General", "weak"
@@ -158,5 +160,29 @@ def main():
     print("\n=== via ===")
     for k, v in Counter(r["how"] for r in rows).most_common(): print(f"  {v:3d}  {k}")
 
+def _self_check():
+    # Explicit raises so python -O cannot skip the checks.
+    def expect(title, url, want):
+        got = classify(title, url, "Other bookmarks")
+        if got != want:
+            raise AssertionError((url, got, want))
+    # Real host + subdomain still classify via domain identity.
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"))
+    expect("Docs", "https://docs.github.com/en", ("Dev", "GitHub", "domain"))
+    # FQDN with one trailing DNS root dot still matches.
+    expect("GitHub", "https://github.com./x", ("Dev", "GitHub", "domain"))
+    expect("Docs", "https://docs.github.com./en", ("Dev", "GitHub", "domain"))
+    # Substring / suffix-injection hosts must not.
+    for url in ("https://notgithub.com", "https://github.com.evil.com",
+                "https://myamazon.com", "https://xxbbc.com"):
+        via = classify("Bookmark", url, "Other bookmarks")[2]
+        if via == "domain":
+            raise AssertionError((url, via))
+    print("classify self-check ok")
+
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["--self-check"]:
+        _self_check()
+    else:
+        main()
+

@@ -86,7 +86,7 @@ class BookmarkStore {
   // folder_path compare is case-insensitive (trim + lowercase + rejoin) so
   // "bookmarks bar/dev" and USAGE "Other Bookmarks" match Chrome titles.
   // Emitted `folder` keeps Chrome's real casing. No short-alias expansion.
-  // A provided folderPath that normalizes to empty ("/", "///", whitespace)
+  // A provided folderPath that normalizes to empty ("", "/", "///", whitespace)
   // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
   // / null) still lists everything.
   static async listBookmarks(folderPath) {

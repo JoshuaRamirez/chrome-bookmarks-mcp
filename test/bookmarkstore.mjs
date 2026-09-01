@@ -147,8 +147,10 @@ check("listBookmarks matches USAGE Other Bookmarks casing and keeps Chrome folde
 
 // A provided folderPath that normalizes to empty must throw — not list-all.
 // Sibling write tools (ensurePath / apply_moves) use the same "empty path"
-// message. Omit (listBookmarks() above) still lists everything.
-for (const raw of ["/", "///", "   "]) {
+// message. Include "" (falsy but != null) so a truthy `if (folderPath)`
+// regression cannot silently list-all again. Omit (listBookmarks() above)
+// still lists everything.
+for (const raw of ["", "/", "///", "   "]) {
   let threw = false;
   let message = "";
   let leaked = null;

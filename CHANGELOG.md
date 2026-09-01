@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.10]
+
+### Fixed
+- Empty-path coverage for `list_bookmarks` / `listBookmarks` now includes `""`
+  (alongside `/`, `///`, whitespace-only). A provided `folder_path` that
+  normalizes to empty still throws `empty path`; omitting `folder_path` still
+  lists everything. Tests fail a truthy `if (folderPath)` regression that would
+  silently list-all on `""`.
+
 ## [1.1.9]
 
 ### Fixed

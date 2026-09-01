@@ -18,7 +18,7 @@ Env:
   BOOKMARKS_SRC   path to Chrome's AccountBookmarks (default: macOS Default profile)
   MOVES_OUT       output TSV path (default: ./proposed-moves.tsv)
 """
-import json, os, re, csv
+import json, os, re, csv, sys
 from urllib.parse import urlparse
 from collections import Counter
 
@@ -128,7 +128,7 @@ def classify(title, url, folder):
         for rx, (tp, sb) in FOLDER_RULES:
             if re.search(rx, folder): return tp, sb, "folder"
     for dom, (tp, sb) in D.items():
-        if dom in h: return tp, sb, "domain"
+        if h == dom or h.endswith("." + dom): return tp, sb, "domain"
     for rx, (tp, sb) in KW:
         if re.search(rx, t): return tp, sb, "keyword"
     return "Reference", "General", "weak"
@@ -158,5 +158,20 @@ def main():
     print("\n=== via ===")
     for k, v in Counter(r["how"] for r in rows).most_common(): print(f"  {v:3d}  {k}")
 
+def _self_check():
+    # Real host + subdomain still classify via domain identity.
+    assert classify("GitHub", "https://github.com", "Other bookmarks") == ("Dev", "GitHub", "domain")
+    assert classify("Docs", "https://docs.github.com/en", "Other bookmarks") == ("Dev", "GitHub", "domain")
+    # Substring / suffix-injection hosts must not.
+    for url in ("https://notgithub.com", "https://github.com.evil.com",
+                "https://myamazon.com", "https://xxbbc.com"):
+        via = classify("Bookmark", url, "Other bookmarks")[2]
+        assert via != "domain", (url, via)
+    print("classify self-check ok")
+
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["--self-check"]:
+        _self_check()
+    else:
+        main()
+

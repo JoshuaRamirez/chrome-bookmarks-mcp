@@ -2,7 +2,7 @@
   "name": "chrome-bookmarks-mcp",
   "displayName": "Chrome Bookmarks MCP",
   "description": "Manage Chrome's synced bookmarks from Claude \u2014 list, search, add, move, rename, dedupe, and reorganize folders. Edits go through chrome.bookmarks via a companion extension, so they sync durably.",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "author": {
     "name": "Joshua Ramirez"
   }

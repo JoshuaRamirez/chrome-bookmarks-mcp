@@ -83,15 +83,21 @@ class BookmarkStore {
   // folder path (e.g. "Bookmarks bar / Dev"), matching that folder and anything
   // beneath it. Flat + scoped keeps results bounded — the whole nested tree is
   // rarely what a caller wants and can be very large.
+  // folder_path compare is case-insensitive (trim + lowercase + rejoin) so
+  // "bookmarks bar/dev" and USAGE "Other Bookmarks" match Chrome titles.
+  // Emitted `folder` keeps Chrome's real casing. No short-alias expansion.
   static async listBookmarks(folderPath) {
-    const prefix = folderPath
-      ? String(folderPath).split("/").map((s) => s.trim()).filter(Boolean).join(" / ")
-      : "";
+    const pathKey = (p) =>
+      String(p).split("/").map((s) => s.trim().toLowerCase()).filter(Boolean).join(" / ");
+    const prefix = folderPath ? pathKey(folderPath) : "";
     const out = [];
     await BookmarkStore.walk((node, _p, _d, path) => {
       if (!node.url) return;
       const folder = path.filter(Boolean).join(" / ") || "(root)";
-      if (prefix && folder !== prefix && !folder.startsWith(prefix + " / ")) return;
+      if (prefix) {
+        const key = pathKey(folder);
+        if (key !== prefix && !key.startsWith(prefix + " / ")) return;
+      }
       out.push({ id: node.id, title: node.title, url: node.url, folder });
     });
     return out;

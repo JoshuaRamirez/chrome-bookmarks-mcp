@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.8]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` now matches `folder_path` case-insensitively
+  (trim + lowercase + rejoin), so `bookmarks bar/dev` and USAGE `Other Bookmarks`
+  return the same hits as Chrome's real titles. Emitted `folder` strings keep
+  Chrome's casing. No short-alias expansion (`bar` / `other` / `mobile`).
+
 ## [1.1.7]
 
 ### Fixed

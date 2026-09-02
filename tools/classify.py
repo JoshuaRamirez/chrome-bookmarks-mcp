@@ -125,16 +125,30 @@ def normalize_host(h):
         h = h[4:]  # at most one leading www. label
     return h[:-1] if h.endswith(".") else h  # one trailing DNS root dot
 
+def host(u):
+    try:
+        return normalize_host(urlparse(u).hostname or "")
+    except Exception: return ""
+
+def normalize_domain_key(raw):
+    # Same identity as host(): urlparse().hostname drops scheme, path, :port,
+    # and trailing slash. Bare host keys get a scheme-relative prefix so they
+    # parse the same way. Real hostnames still go through normalize_host.
+    s = raw or ""
+    if "://" not in s and not s.startswith("//"):
+        s = "//" + s
+    return host(s)
+
 def load_user_rules(cfg=None):
     if cfg is None:
         path = os.path.join(HERE, "classify.rules.json")
         if not os.path.exists(path):
             return
         cfg = json.load(open(path))
-    # Same identity as host() so TitleCase / www. / WWW. keys override built-ins.
-    # Skip keys that normalize to "" ("." / "www.") so they cannot match host("").
+    # Same identity as host() so TitleCase / www. / URL / path / port / slash
+    # keys override built-ins. Skip keys that normalize to "" ("." / "www.").
     for raw, pair in (cfg.get("domains") or {}).items():
-        key = normalize_host(raw)
+        key = normalize_domain_key(raw)
         if not key:
             continue
         D[key] = tuple(pair)
@@ -142,11 +156,6 @@ def load_user_rules(cfg=None):
         KW.insert(0, (rx, tuple(pair)))
     for rx, pair in (cfg.get("folders") or []):
         _USER_FOLDER_RULES.insert(0, (rx, tuple(pair)))
-
-def host(u):
-    try:
-        return normalize_host(urlparse(u).hostname or "")
-    except Exception: return ""
 
 def classify(title, url, folder):
     t = (title or "").lower(); h = host(url)
@@ -273,6 +282,34 @@ def _self_check():
         via = classify("Bookmark", "", "Other bookmarks")[2]
         if via == "domain":
             raise AssertionError(("", via))
+    finally:
+        D.pop("", None)
+    # URL / path / port / slash-shaped user keys share host() identity (#77).
+    url_keys = (
+        "GitHub.com",
+        "https://github.com",
+        "http://www.GitHub.com/path",
+        "github.com/foo",
+        "github.com:443",
+        "www.github.com/",
+        "//github.com",
+    )
+    saved_gh = D["github.com"]
+    try:
+        for key in url_keys:
+            if normalize_domain_key(key) != host("https://www.github.com/x"):
+                raise AssertionError((key, normalize_domain_key(key),
+                                      host("https://www.github.com/x")))
+            load_user_rules({"domains": {key: ["Dev", "URLKey"]}})
+            expect("G", "https://www.github.com/x",
+                   ("Dev", "URLKey", "domain"))
+    finally:
+        D["github.com"] = saved_gh
+    # URL-shaped keys that still normalize to "" must also skip D[""] (#77).
+    load_user_rules({"domains": {"https://": ["X", "Y"], "//": ["X", "Y"]}})
+    try:
+        if "" in D:
+            raise AssertionError(("empty url domain key", D[""]))
     finally:
         D.pop("", None)
     # Leading www. still strips; real hosts stay via=domain.

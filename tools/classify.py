@@ -132,8 +132,12 @@ def load_user_rules(cfg=None):
             return
         cfg = json.load(open(path))
     # Same identity as host() so TitleCase / www. / WWW. keys override built-ins.
+    # Skip keys that normalize to "" ("." / "www.") so they cannot match host("").
     for raw, pair in (cfg.get("domains") or {}).items():
-        D[normalize_host(raw)] = tuple(pair)
+        key = normalize_host(raw)
+        if not key:
+            continue
+        D[key] = tuple(pair)
     for rx, pair in (cfg.get("keywords") or []):
         KW.insert(0, (rx, tuple(pair)))
     for rx, pair in (cfg.get("folders") or []):
@@ -257,6 +261,18 @@ def _self_check():
     finally:
         D["github.com"] = saved_gh
         D["amazon.com"] = saved_az
+    # Keys that normalize to "" must not insert D[""] or steal empty URLs (#73).
+    load_user_rules({"domains": {".": ["X", "Y"], "www.": ["X", "Y"]}})
+    try:
+        if "" in D:
+            raise AssertionError(("empty domain key", D[""]))
+        expect("x", "", ("JUNK", "", "junk"))
+        expect("ab", "not-a-url", ("JUNK", "", "junk"))
+        via = classify("Bookmark", "", "Other bookmarks")[2]
+        if via == "domain":
+            raise AssertionError(("", via))
+    finally:
+        D.pop("", None)
     # Leading www. still strips; real hosts stay via=domain.
     expect("GitHub", "https://www.github.com", ("Dev", "GitHub", "domain"))
     expect("Amazon", "https://www.amazon.com", ("Shopping", "", "domain"))

@@ -56,9 +56,11 @@ def is_junk(title, host):
     t = (title or "").strip().lower()
     if t in JUNK_TITLES: return True
     if host in JUNK_HOSTS: return True
-    # Short titles are junk only when there is no meaningful host. A blanket
-    # len(t) <= 2 fired before domain match and proposed DELETE? for real
-    # bookmarks titled HN / AI / JS / GH on well-known URLs.
+    return False
+
+def is_short_title_junk(title, host):
+    t = (title or "").strip().lower()
+    if len(t) <= 2: return True
     if host == "" and len(t) < 4: return True
     return False
 
@@ -135,6 +137,9 @@ def classify(title, url, folder):
             if re.search(rx, folder): return tp, sb, "folder"
     for dom, (tp, sb) in D.items():
         if h == dom or h.endswith("." + dom): return tp, sb, "domain"
+    # After domain match: short garbage on unknown / empty hosts stays junk.
+    # A blanket len(t) <= 2 before this loop proposed DELETE? for HN / AI / JS / GH.
+    if is_short_title_junk(title, h): return "JUNK", "", "junk"
     for rx, (tp, sb) in KW:
         if re.search(rx, t): return tp, sb, "keyword"
     return "Reference", "General", "weak"
@@ -185,11 +190,13 @@ def _self_check():
     expect("JS", "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
            ("Dev", "Web", "domain"))
     expect("GH", "https://github.com", ("Dev", "GitHub", "domain"))
-    # Explicit junk lists stay first; short garbage still junk with no host.
+    # Explicit junk lists stay first; short garbage still junk off known domains.
     expect("untitled", "https://github.com", ("JUNK", "", "junk"))
     expect("GitHub", "https://localhost", ("JUNK", "", "junk"))
     expect("x", "", ("JUNK", "", "junk"))
     expect("ab", "not-a-url", ("JUNK", "", "junk"))
+    expect("XX", "https://random.invalid", ("JUNK", "", "junk"))
+    expect("ab", "https://example.com", ("JUNK", "", "junk"))
     # Substring / suffix-injection / middle-label www. hosts must not.
     for url in ("https://notgithub.com", "https://github.com.evil.com",
                 "https://myamazon.com", "https://xxbbc.com",

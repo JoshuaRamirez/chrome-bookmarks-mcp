@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.10]
+
+### Fixed
+- Write-path tools that go through `resolveFolder` (`add_bookmark`,
+  `create_folder`, `move_bookmark`, `import_json`) now reject a provided empty
+  folder path (`""`) with `empty path`, matching `ensurePath` and
+  `list_bookmarks`. Omitting the path still uses the tool default (`Bookmarks
+  bar`, or `Other bookmarks` for import). `move_bookmark` with both destination
+  arguments omitted still asks for `to_path` or `to_parent_id`.
+
 ## [1.1.9]
 
 ### Fixed

@@ -151,7 +151,11 @@ def host(u):
 def classify(title, url, folder):
     t = (title or "").lower(); h = host(url)
     if is_junk(title, h): return "JUNK", "", "junk"
-    if not re.search(r"Unsorted$", folder) and folder != "Other bookmarks":
+    # Skip folder rules for the Other bookmarks root and Unsorted holding
+    # folders so domain/keyword can catalogue. Last segment, case-insensitive
+    # identity — not Unsorted$ — so MyUnsorted is a real folder (#79).
+    last = (folder or "").rsplit("/", 1)[-1]
+    if last.lower() != "unsorted" and folder != "Other bookmarks":
         for rx, (tp, sb) in _USER_FOLDER_RULES:
             if re.search(rx, folder): return tp, sb, "folder"
         for rx, (tp, sb) in FOLDER_RULES:
@@ -330,6 +334,28 @@ def _self_check():
            folder="Other bookmarks/AI")
     expect("GitHub", "https://github.com", ("Dev", "", "folder"),
            folder="Other bookmarks/Dev")
+    # Unsorted holding folders skip folder rules so domain/keyword can run (#79).
+    # Last segment is case-insensitive; TitleCase and variants all skip.
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/Unsorted")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/News/Unsorted")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/News/unsorted")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/Dev/UNSORTED")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/AI/unsorted")
+    # Compound last segments are not the holding folder (not Unsorted$).
+    expect("GitHub", "https://github.com", ("News", "", "folder"),
+           folder="Other bookmarks/News/MyUnsorted")
+    # Unknown hosts under Unsorted still get keyword/weak, not parent folder.
+    expect("Docker tutorial", "https://example.com/d",
+           ("Dev", "Cloud", "keyword"),
+           folder="Other bookmarks/News/unsorted")
+    expect("Bookmark", "https://unknown.example/x",
+           ("Reference", "General", "weak"),
+           folder="Other bookmarks/News/UNSORTED")
     # User classify.rules.json folder regexes stay case-sensitive.
     _USER_FOLDER_RULES.insert(0, (r"^Other bookmarks/Work$", ("Work", "User")))
     try:

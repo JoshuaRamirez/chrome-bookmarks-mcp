@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import vm from "node:vm";
+import { splitPath } from "../src/folder-path.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -20,6 +21,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 //       "MCP Spec"  https://modelcontextprotocol.io   (100)
 //       "React"     https://react.dev                 (101)
 //     "GitHub"      https://github.com                (102)
+//     CI/CD(30)                  <- title contains "/"
+//       "Jenkins"   https://jenkins.example           (300)
+//       Nested(31)
+//         "Nested job" https://nested.example         (310)
+//     CI(40)                     <- real nested CI → CD (contrast with CI/CD)
+//       CD(41)
+//         "Nested CD" https://cd.example              (410)
+//     foo\bar(50)                <- title contains "\"
+//       "Slash"     https://backslash.example         (500)
 //   Other bookmarks(2)
 //     News(20)
 //       "HN"        https://news.ycombinator.com      (200)
@@ -32,6 +42,20 @@ const TREE = {
         { id: "101", title: "React", url: "https://react.dev", parentId: "10" },
       ] },
       { id: "102", title: "GitHub", url: "https://github.com", parentId: "1" },
+      { id: "30", title: "CI/CD", parentId: "1", children: [
+        { id: "300", title: "Jenkins", url: "https://jenkins.example", parentId: "30" },
+        { id: "31", title: "Nested", parentId: "30", children: [
+          { id: "310", title: "Nested job", url: "https://nested.example", parentId: "31" },
+        ] },
+      ] },
+      { id: "40", title: "CI", parentId: "1", children: [
+        { id: "41", title: "CD", parentId: "40", children: [
+          { id: "410", title: "Nested CD", url: "https://cd.example", parentId: "41" },
+        ] },
+      ] },
+      { id: "50", title: "foo\\bar", parentId: "1", children: [
+        { id: "500", title: "Slash", url: "https://backslash.example", parentId: "50" },
+      ] },
     ] },
     { id: "2", title: "Other bookmarks", parentId: "0", children: [
       { id: "20", title: "News", parentId: "2", children: [
@@ -41,6 +65,19 @@ const TREE = {
     ] },
   ],
 };
+
+// Resolve title segments against the mock tree the same way ensurePath does
+// (match existing folder titles; do not create). Proves a list_folders path
+// round-trips to that folder id, not a nested mis-read of "/" in the title.
+function resolveBySegments(segments) {
+  let cur = TREE;
+  for (const seg of segments) {
+    const kids = (cur.children || []).filter((k) => !k.url);
+    cur = kids.find((k) => (k.title || "").toLowerCase() === String(seg).toLowerCase());
+    if (!cur) return null;
+  }
+  return cur;
+}
 
 function flatten(node, acc = []) {
   acc.push(node);
@@ -87,7 +124,7 @@ function check(name, cond, detail) {
 }
 
 const stats = await BookmarkStore.stats();
-check("stats counts folders and urls", stats.folders === 4 && stats.urls === 5, JSON.stringify(stats));
+check("stats counts folders and urls", stats.folders === 9 && stats.urls === 9, JSON.stringify(stats));
 
 const folders = await BookmarkStore.listFolders();
 const devPath = folders.find((f) => f.id === "10")?.path;
@@ -122,7 +159,7 @@ check("searchWithPaths omits folder hits and keeps bookmark folder path",
 
 const all = await BookmarkStore.listBookmarks();
 check("listBookmarks returns a flat list of all bookmarks with folders",
-  all.length === 5 && all.every((b) => b.id && b.url && b.folder),
+  all.length === 9 && all.every((b) => b.id && b.url && b.folder),
   JSON.stringify(all));
 
 const scoped = await BookmarkStore.listBookmarks("Bookmarks bar/Dev");
@@ -186,6 +223,83 @@ check("importInto recreates the tree (folder then children)",
   chrome.bookmarks._created.length === 3 &&
   !folderFirst.url && folderFirst.title === "Imported",
   `created=${createdCount} nodes=${JSON.stringify(chrome.bookmarks._created)}`);
+
+// --- slash / backslash titles: emit → splitPath → same folder ---------------
+check("splitPath keeps ordinary slash paths as title segments",
+  JSON.stringify(splitPath("Bookmarks bar / Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]) &&
+  JSON.stringify(splitPath("Bookmarks bar/Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]) &&
+  JSON.stringify(splitPath("bookmarks bar/dev")) === JSON.stringify(["bookmarks bar", "dev"]),
+  JSON.stringify(splitPath("Bookmarks bar / Dev")));
+
+check("splitPath treats escaped / and \\ as title characters",
+  JSON.stringify(splitPath("Bookmarks bar / CI\\/CD")) === JSON.stringify(["Bookmarks bar", "CI/CD"]) &&
+  JSON.stringify(splitPath("Bookmarks bar/CI\\/CD")) === JSON.stringify(["Bookmarks bar", "CI/CD"]) &&
+  JSON.stringify(splitPath("Bookmarks bar / foo\\\\bar")) === JSON.stringify(["Bookmarks bar", "foo\\bar"]),
+  JSON.stringify({
+    cicd: splitPath("Bookmarks bar / CI\\/CD"),
+    bs: splitPath("Bookmarks bar / foo\\\\bar"),
+  }));
+
+check("splitPath still drops empty segments (empty path)",
+  JSON.stringify(splitPath("/")) === "[]" &&
+  JSON.stringify(splitPath("///")) === "[]" &&
+  JSON.stringify(splitPath("   ")) === "[]",
+  JSON.stringify(splitPath("///")));
+
+const cicdFolder = folders.find((f) => f.id === "30");
+const cicdPath = cicdFolder?.path;
+const cicdSegs = splitPath(cicdPath);
+check("listFolders emits an escaped path for a CI/CD title",
+  cicdPath === "Bookmarks bar / CI\\/CD",
+  cicdPath);
+check("listFolders CI/CD path round-trips through splitPath to that folder (not nested CI→CD)",
+  JSON.stringify(cicdSegs) === JSON.stringify(["Bookmarks bar", "CI/CD"]) &&
+  resolveBySegments(cicdSegs)?.id === "30" &&
+  resolveBySegments(splitPath("Bookmarks bar/CI/CD"))?.id === "41",
+  JSON.stringify({ cicdPath, cicdSegs, nested: resolveBySegments(splitPath("Bookmarks bar/CI/CD"))?.id }));
+
+const nestedFolder = folders.find((f) => f.id === "31");
+check("listFolders escapes / in ancestor titles on descendant paths",
+  nestedFolder?.path === "Bookmarks bar / CI\\/CD / Nested",
+  nestedFolder?.path);
+
+const bsFolder = folders.find((f) => f.id === "50");
+check("listFolders escapes backslash in titles and splitPath round-trips",
+  bsFolder?.path === "Bookmarks bar / foo\\\\bar" &&
+  JSON.stringify(splitPath(bsFolder?.path)) === JSON.stringify(["Bookmarks bar", "foo\\bar"]) &&
+  resolveBySegments(splitPath(bsFolder?.path))?.id === "50",
+  bsFolder?.path);
+
+const cicdHits = await BookmarkStore.listBookmarks(cicdPath);
+check("listBookmarks with the CI/CD list_folders path scopes to that folder and subfolders",
+  cicdHits.length === 2 &&
+  cicdHits.some((b) => b.id === "300" && b.folder === "Bookmarks bar / CI\\/CD") &&
+  cicdHits.some((b) => b.id === "310" && b.folder === "Bookmarks bar / CI\\/CD / Nested") &&
+  cicdHits.every((b) => b.id !== "410"),
+  JSON.stringify(cicdHits));
+
+const falsePrefix = await BookmarkStore.listBookmarks("Bookmarks bar/CI");
+check("listBookmarks Bookmarks bar/CI does not match a CI/CD title (false prefix)",
+  falsePrefix.length === 1 &&
+  falsePrefix[0].id === "410" &&
+  falsePrefix[0].folder === "Bookmarks bar / CI / CD" &&
+  falsePrefix.every((b) => b.id !== "300" && b.id !== "310"),
+  JSON.stringify(falsePrefix));
+
+const nestedCd = await BookmarkStore.listBookmarks("Bookmarks bar/CI/CD");
+check("listBookmarks unescaped Bookmarks bar/CI/CD is the nested CI→CD folder",
+  nestedCd.length === 1 && nestedCd[0].id === "410",
+  JSON.stringify(nestedCd));
+
+const bsHits = await BookmarkStore.listBookmarks(bsFolder?.path);
+check("listBookmarks scopes a backslash title via its escaped list_folders path",
+  bsHits.length === 1 && bsHits[0].id === "500" && bsHits[0].folder === "Bookmarks bar / foo\\\\bar",
+  JSON.stringify(bsHits));
+
+const searchJenkins = await BookmarkStore.searchWithPaths("Jenkins");
+check("searchWithPaths emits escaped folder paths for slash titles",
+  searchJenkins.length === 1 && searchJenkins[0].folder === "Bookmarks bar / CI\\/CD",
+  JSON.stringify(searchJenkins));
 
 console.log(failed ? `\nBOOKMARKSTORE TESTS FAILED (${failed})` : "\nBOOKMARKSTORE TESTS PASSED");
 process.exit(failed ? 1 : 0);

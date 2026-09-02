@@ -24891,6 +24891,28 @@ var Bridge = class {
   }
 };
 
+// src/folder-path.js
+function splitPath(p) {
+  const s = String(p || "");
+  const out = [];
+  let buf = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") {
+      if (i + 1 < s.length) buf += s[++i];
+      continue;
+    }
+    if (ch === "/") {
+      out.push(buf.trim());
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf.trim());
+  return out.filter(Boolean);
+}
+
 // src/server.js
 var import_meta = {};
 var PLAN_DEFAULT = process.env.BOOKMARK_PLAN_FILE || (0, import_node_path.join)((0, import_node_os.homedir)() || (0, import_node_os.tmpdir)(), ".chrome-bookmarks-mcp", "proposed-moves.tsv");
@@ -24905,11 +24927,10 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.10" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.11" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
-var splitPath = (p) => String(p || "").split("/").map((s) => s.trim()).filter(Boolean);
 var PERMANENT_ROOT_ALIASES = /* @__PURE__ */ new Map([
   ["bar", ["bookmarks-bar", "1"]],
   ["toolbar", ["bookmarks-bar", "1"]],
@@ -25156,7 +25177,7 @@ server.tool(
           continue;
         }
         if (!folderId.has(proposed)) {
-          const segments = proposed.split("/").map((s) => s.trim()).filter(Boolean);
+          const segments = splitPath(proposed);
           if (dry_run) {
             assertPermanentRoot(segments);
             folderId.set(proposed, "(dry)");

@@ -4,6 +4,36 @@
 // Loaded as a classic script (importScripts in the worker, <script> in pages),
 // so it exposes the class on globalThis by name.
 
+// Path codec — keep in lockstep with src/folder-path.js.
+// Escape \ then / in each title so "A / B / C" paths round-trip when a title
+// contains / or \. splitPath is the inverse: split on unescaped /, unescape.
+function escapePathSegment(title) {
+  return String(title ?? "").replace(/\\/g, "\\\\").replace(/\//g, "\\/");
+}
+function joinFolderPath(titles) {
+  return (titles || []).filter(Boolean).map(escapePathSegment).join(" / ");
+}
+function splitPath(p) {
+  const s = String(p || "");
+  const out = [];
+  let buf = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") {
+      if (i + 1 < s.length) buf += s[++i];
+      continue;
+    }
+    if (ch === "/") {
+      out.push(buf.trim());
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf.trim());
+  return out.filter(Boolean);
+}
+
 class BookmarkStore {
   // Conventional permanent ids; treated as non-editable roots.
   static PERMANENT_PARENT = "0"; // children of the tree root are the permanent folders
@@ -31,9 +61,9 @@ class BookmarkStore {
   static async searchWithPaths(query) {
     const hits = (await chrome.bookmarks.search(query)).filter(h => h.url);
     if (!hits.length) return [];
-    const folderPath = new Map(); // folder id -> "A / B / C" (including itself)
+    const folderPath = new Map(); // folder id -> escaped "A / B / C" (including itself)
     await BookmarkStore.walk((node, _p, _d, path) => {
-      if (!node.url) folderPath.set(node.id, path.concat(node.title).filter(Boolean).join(" / "));
+      if (!node.url) folderPath.set(node.id, joinFolderPath(path.concat(node.title)));
     });
     return hits.map(h => ({
       id: h.id,
@@ -66,7 +96,7 @@ class BookmarkStore {
       if (!node.url) {
         out.push({
           id: node.id, title: node.title, depth,
-          path: path.concat(node.title).filter(Boolean).join(" / ")
+          path: joinFolderPath(path.concat(node.title))
         });
       }
     });
@@ -83,27 +113,28 @@ class BookmarkStore {
   // folder path (e.g. "Bookmarks bar / Dev"), matching that folder and anything
   // beneath it. Flat + scoped keeps results bounded — the whole nested tree is
   // rarely what a caller wants and can be very large.
-  // folder_path compare is case-insensitive (trim + lowercase + rejoin) so
-  // "bookmarks bar/dev" and USAGE "Other Bookmarks" match Chrome titles.
-  // Emitted `folder` keeps Chrome's real casing. No short-alias expansion.
+  // folder_path compare is case-insensitive on real title segments (splitPath
+  // unescapes; no join→re-split) so "bookmarks bar/dev" and USAGE
+  // "Other Bookmarks" match Chrome titles, and a title like "CI/CD" is one
+  // segment. Emitted `folder` keeps Chrome's casing with / and \ escaped so
+  // the string round-trips through splitPath. No short-alias expansion.
   // A provided folderPath that normalizes to empty ("/", "///", whitespace)
   // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
   // / null) still lists everything.
   static async listBookmarks(folderPath) {
-    const pathKey = (p) =>
-      String(p).split("/").map((s) => s.trim().toLowerCase()).filter(Boolean).join(" / ");
-    let prefix = "";
+    let prefixSegs = null;
     if (folderPath != null) {
-      prefix = pathKey(folderPath);
-      if (!prefix) throw new Error("empty path");
+      prefixSegs = splitPath(folderPath).map((s) => s.toLowerCase());
+      if (!prefixSegs.length) throw new Error("empty path");
     }
     const out = [];
     await BookmarkStore.walk((node, _p, _d, path) => {
       if (!node.url) return;
-      const folder = path.filter(Boolean).join(" / ") || "(root)";
-      if (prefix) {
-        const key = pathKey(folder);
-        if (key !== prefix && !key.startsWith(prefix + " / ")) return;
+      const titles = path.filter(Boolean);
+      const folder = joinFolderPath(titles) || "(root)";
+      if (prefixSegs) {
+        const key = titles.map((s) => String(s).trim().toLowerCase());
+        if (key.length < prefixSegs.length || !prefixSegs.every((s, i) => s === key[i])) return;
       }
       out.push({ id: node.id, title: node.title, url: node.url, folder });
     });
@@ -116,7 +147,7 @@ class BookmarkStore {
     await BookmarkStore.walk((node, _p, _d, path) => {
       if (!node.url) return;
       const arr = byUrl.get(node.url) || [];
-      arr.push({ id: node.id, title: node.title, folder: path.filter(Boolean).join(" / ") || "(root)" });
+      arr.push({ id: node.id, title: node.title, folder: joinFolderPath(path.filter(Boolean)) || "(root)" });
       byUrl.set(node.url, arr);
     });
     return [...byUrl.entries()]

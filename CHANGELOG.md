@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.11]
+
+### Fixed
+- Folder paths now round-trip when a title contains `/` or `\` (e.g. `CI/CD`).
+  `list_folders`, `list_bookmarks`, `search_bookmarks`, and `find_duplicates`
+  escape those characters inside each segment; `splitPath` / `ensure_folder_path`
+  / `resolveFolder` / `apply_moves` unescape so the path resolves to that folder
+  instead of creating nested `CI` → `CD`. `list_bookmarks` matches on real title
+  segments, so `Bookmarks bar/CI` no longer includes bookmarks under `CI/CD`.
+
 ## [1.1.10]
 
 ### Fixed

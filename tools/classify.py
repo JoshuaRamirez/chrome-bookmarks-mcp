@@ -168,8 +168,10 @@ def classify(title, url, folder):
     # After domain match: short garbage on unknown / empty hosts stays junk.
     # A blanket len(t) <= 2 before this loop proposed DELETE? for HN / AI / JS / GH.
     if is_short_title_junk(title, h): return "JUNK", "", "junk"
+    # User + built-in KW patterns share IGNORECASE so TitleCase rules.json
+    # keywords still match the lowercased title (same leftover class as #73).
     for rx, (tp, sb) in KW:
-        if re.search(rx, t): return tp, sb, "keyword"
+        if re.search(rx, t, flags=re.IGNORECASE): return tp, sb, "keyword"
     return "Reference", "General", "weak"
 
 def main():
@@ -388,6 +390,24 @@ def _self_check():
            ("Dev", "Architecture", "keyword"))
     expect("stocks", "https://example.com/st",
            ("Finance", "", "keyword"))
+    # User classify.rules.json keywords share IGNORECASE so TitleCase overrides (#75).
+    n_kw = len(KW)
+    try:
+        load_user_rules({"keywords": [[r"\bReact\b", ["Dev", "Override"]]]})
+        expect("React hooks", "https://unknown.example/r",
+               ("Dev", "Override", "keyword"))
+        load_user_rules({"keywords": [[r"\bDocker\b", ["Dev", "Override"]]]})
+        expect("Docker compose", "https://unknown.example/d",
+               ("Dev", "Override", "keyword"))
+        load_user_rules({"keywords": [[r"\bSvelte\b", ["Dev", "Web"]]]})
+        expect("Svelte tutorial", "https://unknown.example/s",
+               ("Dev", "Web", "keyword"))
+        # Lowercase user KW still prepends and wins (same path as TitleCase).
+        load_user_rules({"keywords": [[r"\breact\b", ["Dev", "Lower"]]]})
+        expect("React hooks", "https://unknown.example/r",
+               ("Dev", "Lower", "keyword"))
+    finally:
+        del KW[:len(KW) - n_kw]
     print("classify self-check ok")
 
 if __name__ == "__main__":

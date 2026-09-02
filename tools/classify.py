@@ -28,23 +28,26 @@ SRC = os.environ.get("BOOKMARKS_SRC",
 OUT = os.environ.get("MOVES_OUT", os.path.join(os.getcwd(), "proposed-moves.tsv"))
 
 # ---------- neutral starter taxonomy: existing folder name -> (top, sub) ----
+# Matched case-insensitively with KW-style word boundaries so path tokens like
+# News / AI / Dev / Articles hit, but DETAILS / Newspaper / JavaScript do not.
 FOLDER_RULES = [
-    (r"Web Dev|Web Development|Frontend|Front-?end|Angular|React|Vue|TypeScript|WebPack|Bootstrap", ("Dev", "Web")),
-    (r"AWS|Azure|Cloud|Kubernetes|Docker|DevOps", ("Dev", "Cloud")),
-    (r"\.NET|C#|Java|Python|Golang|Rust", ("Dev", "Languages")),
-    (r"Software|Programming|Dev\b|Engineering", ("Dev", "")),
-    (r"AI|LLM|Machine Learning|ML\b", ("AI", "")),
-    (r"Games?|Gaming", ("Games", "")),
-    (r"Crypto|Trading|Stocks|Finance|Investing", ("Finance", "")),
-    (r"Shopping|Deals|Wishlist", ("Shopping", "")),
-    (r"Work|Projects", ("Work", "")),
-    (r"Recipes?|Food|Cooking", ("Food", "")),
-    (r"Travel|Trips|Vacation", ("Travel", "")),
-    (r"News|Politics", ("News", "")),
-    (r"Music", ("Music", "")),
-    (r"Design|Art|Inspiration", ("Design", "")),
-    (r"Reading|Articles|Reference|Learning", ("Reference", "")),
-    (r"Personal", ("Personal", "")),
+    (r"\bWeb Dev\b|\bWeb Development\b|\bFrontend\b|\bFront-?end\b|\bAngular\b|\bReact\b|\bVue\b|\bTypeScript\b|\bWebPack\b|\bBootstrap\b", ("Dev", "Web")),
+    (r"\bAWS\b|\bAzure\b|\bCloud\b|\bKubernetes\b|\bDocker\b|\bDevOps\b", ("Dev", "Cloud")),
+    # .NET / C# start or end on non-word chars; \b on the letter side only.
+    (r"\.NET\b|\bC#|\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
+    (r"\bSoftware\b|\bProgramming\b|\bDev\b|\bEngineering\b", ("Dev", "")),
+    (r"\bAI\b|\bLLM\b|\bMachine Learning\b|\bML\b", ("AI", "")),
+    (r"\bGames?\b|\bGaming\b", ("Games", "")),
+    (r"\bCrypto\b|\bTrading\b|\bStocks\b|\bFinance\b|\bInvesting\b", ("Finance", "")),
+    (r"\bShopping\b|\bDeals\b|\bWishlist\b", ("Shopping", "")),
+    (r"\bWork\b|\bProjects\b", ("Work", "")),
+    (r"\bRecipes?\b|\bFood\b|\bCooking\b", ("Food", "")),
+    (r"\bTravel\b|\bTrips\b|\bVacation\b", ("Travel", "")),
+    (r"\bNews\b|\bPolitics\b", ("News", "")),
+    (r"\bMusic\b", ("Music", "")),
+    (r"\bDesign\b|\bArt\b|\bInspiration\b", ("Design", "")),
+    (r"\bReading\b|\bArticles\b|\bReference\b|\bLearning\b", ("Reference", "")),
+    (r"\bPersonal\b", ("Personal", "")),
 ]
 
 # ---------- obvious junk (propose deletion) --------------------------------
@@ -134,7 +137,7 @@ def classify(title, url, folder):
     if is_junk(title, h): return "JUNK", "", "junk"
     if not re.search(r"Unsorted$", folder) and folder != "Other bookmarks":
         for rx, (tp, sb) in FOLDER_RULES:
-            if re.search(rx, folder): return tp, sb, "folder"
+            if re.search(rx, folder, flags=re.IGNORECASE): return tp, sb, "folder"
     for dom, (tp, sb) in D.items():
         if h == dom or h.endswith("." + dom): return tp, sb, "domain"
     # After domain match: short garbage on unknown / empty hosts stays junk.
@@ -171,10 +174,10 @@ def main():
 
 def _self_check():
     # Explicit raises so python -O cannot skip the checks.
-    def expect(title, url, want):
-        got = classify(title, url, "Other bookmarks")
+    def expect(title, url, want, folder="Other bookmarks"):
+        got = classify(title, url, folder)
         if got != want:
-            raise AssertionError((url, got, want))
+            raise AssertionError((url, folder, got, want))
     # Real host + subdomain still classify via domain identity.
     expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"))
     expect("Docs", "https://docs.github.com/en", ("Dev", "GitHub", "domain"))
@@ -204,6 +207,35 @@ def _self_check():
         via = classify("Bookmark", url, "Other bookmarks")[2]
         if via == "domain":
             raise AssertionError((url, via))
+    # Folder-path substrings must not steal a known-domain hit (#67).
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/DETAILS")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/AVAILABLE")
+    expect("Amazon", "https://amazon.com", ("Shopping", "", "domain"),
+           folder="Other bookmarks/Newspaper")
+    expect("Spotify", "https://spotify.com", ("Music", "", "domain"),
+           folder="Other bookmarks/Musical")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/JavaScript")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/Cloudinary")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/Foodle")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/Artist")
+    # Articles is a real segment (Reference), not the Art→Design substring hit.
+    expect("GitHub", "https://github.com", ("Reference", "", "folder"),
+           folder="Other bookmarks/Articles")
+    # Genuine folder segments still win before domain (case-insensitive).
+    expect("GitHub", "https://github.com", ("News", "", "folder"),
+           folder="Other bookmarks/News")
+    expect("GitHub", "https://github.com", ("News", "", "folder"),
+           folder="Other bookmarks/news")
+    expect("GitHub", "https://github.com", ("AI", "", "folder"),
+           folder="Other bookmarks/AI")
+    expect("GitHub", "https://github.com", ("Dev", "", "folder"),
+           folder="Other bookmarks/Dev")
     print("classify self-check ok")
 
 if __name__ == "__main__":

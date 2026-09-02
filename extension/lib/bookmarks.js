@@ -7,8 +7,10 @@
 // Path codec — keep in lockstep with src/folder-path.js.
 // Escape \ then / in each title so "A / B / C" paths round-trip when a title
 // contains / or \. splitPath is the inverse: split on unescaped /, unescape,
-// and drop at most one space of " / " separator padding (not .trim(), so
-// title-edge spaces and tabs survive).
+// and drop at most one space of " / " separator padding (not .trim() on
+// child segments, so title-edge spaces and tabs survive). The first
+// segment (permanent root) is trimmed so " Bookmarks bar / Dev" still
+// matches writes that go through permanentRootAlias.trim().
 function escapePathSegment(title) {
   return String(title ?? "").replace(/\\/g, "\\\\").replace(/\//g, "\\/");
 }
@@ -42,7 +44,9 @@ function splitPath(p) {
     buf += ch;
   }
   out.push(buf);
-  return out.filter(Boolean);
+  const segs = out.filter(Boolean);
+  if (segs.length) segs[0] = segs[0].trim();
+  return segs.filter(Boolean);
 }
 
 class BookmarkStore {

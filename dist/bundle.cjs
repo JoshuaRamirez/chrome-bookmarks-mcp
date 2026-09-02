@@ -24919,7 +24919,9 @@ function splitPath(p) {
     buf += ch;
   }
   out.push(buf);
-  return out.filter(Boolean);
+  const segs = out.filter(Boolean);
+  if (segs.length) segs[0] = segs[0].trim();
+  return segs.filter(Boolean);
 }
 
 // src/server.js

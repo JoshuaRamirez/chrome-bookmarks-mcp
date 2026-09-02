@@ -341,6 +341,17 @@ check("splitPath keeps title-edge spaces (not full-segment trim)",
     compact: splitPath("Bookmarks bar/Dev"),
   }));
 
+check("splitPath trims padding on the permanent-root segment only",
+  JSON.stringify(splitPath(" Bookmarks bar / Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]) &&
+  JSON.stringify(splitPath("  Bookmarks bar / Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]) &&
+  JSON.stringify(splitPath(" Bookmarks bar /  Dev")) === JSON.stringify(["Bookmarks bar", " Dev"]) &&
+  JSON.stringify(splitPath(" Bookmarks bar / Dev ")) === JSON.stringify(["Bookmarks bar", "Dev "]),
+  JSON.stringify({
+    padded: splitPath(" Bookmarks bar / Dev"),
+    leadChild: splitPath(" Bookmarks bar /  Dev"),
+    trailChild: splitPath(" Bookmarks bar / Dev "),
+  }));
+
 check("splitPath keeps a title-edge tab (does not trim tabs as separator padding)",
   JSON.stringify(splitPath("Bookmarks bar / \tDev")) === JSON.stringify(["Bookmarks bar", "\tDev"]),
   JSON.stringify(splitPath("Bookmarks bar / \tDev")));
@@ -387,6 +398,13 @@ check("listBookmarks Bookmarks bar/Dev does not merge edge-space siblings",
   exactDev.every((b) => b.folder === "Bookmarks bar / Dev") &&
   exactDev.every((b) => b.id !== "600" && b.id !== "700"),
   JSON.stringify(exactDev));
+
+const paddedRoot = await BookmarkStore.listBookmarks(" Bookmarks bar / Dev");
+check("listBookmarks accepts leading padding before the permanent root",
+  paddedRoot.length === 2 &&
+  paddedRoot.every((b) => b.folder === "Bookmarks bar / Dev") &&
+  paddedRoot.every((b) => b.id !== "600" && b.id !== "700"),
+  JSON.stringify(paddedRoot));
 
 console.log(failed ? `\nBOOKMARKSTORE TESTS FAILED (${failed})` : "\nBOOKMARKSTORE TESTS PASSED");
 process.exit(failed ? 1 : 0);

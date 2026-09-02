@@ -11,8 +11,9 @@ All notable changes to this project are documented here. Format loosely follows
   ` / ` separator padding instead of `.trim()` on each segment, so
   `list_folders` paths resolve to that folder instead of a trimmed sibling.
   `list_bookmarks` prefix-compares case-insensitively without trimming live
-  titles, so scoped lists no longer merge edge-space siblings. Slash and
-  backslash escaping from 1.1.11 is unchanged.
+  titles, so scoped lists no longer merge edge-space siblings. Leading
+  padding before the permanent root (` Bookmarks bar / Dev`) is still
+  accepted. Slash and backslash escaping from 1.1.11 is unchanged.
 
 ## [1.1.11]
 

@@ -23,6 +23,11 @@ export function joinFolderPath(titles) {
 // without .trim() on the whole segment (Chrome treats " Dev" ≠ "Dev" ≠ "Dev ").
 // Tabs and extra title-edge spaces are kept. Empty segments are dropped.
 // A whitespace-only path ("", "   ") is empty — same as "/", "///".
+// Trim only the first segment (permanent root): join never emits leading
+// path padding, but humans type " Bookmarks bar / Dev". Writes already
+// accept that via permanentRootAlias.trim(); listBookmarks compares titles
+// without alias expansion, so the root must be normalized here. Child
+// segments keep edge spaces.
 export function splitPath(p) {
   const s = String(p || "");
   if (!s.trim()) return [];
@@ -50,5 +55,7 @@ export function splitPath(p) {
     buf += ch;
   }
   out.push(buf);
-  return out.filter(Boolean);
+  const segs = out.filter(Boolean);
+  if (segs.length) segs[0] = segs[0].trim();
+  return segs.filter(Boolean);
 }

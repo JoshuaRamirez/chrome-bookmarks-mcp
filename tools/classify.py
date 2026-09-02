@@ -33,10 +33,10 @@ OUT = os.environ.get("MOVES_OUT", os.path.join(os.getcwd(), "proposed-moves.tsv"
 FOLDER_RULES = [
     (r"\bWeb Dev\b|\bWeb Development\b|\bFrontend\b|\bFront-?end\b|\bAngular\b|\bReact\b|\bVue\b|\bTypeScript\b|\bWebPack\b|\bBootstrap\b", ("Dev", "Web")),
     (r"\bAWS\b|\bAzure\b|\bCloud\b|\bKubernetes\b|\bDocker\b|\bDevOps\b", ("Dev", "Cloud")),
-    # Bare .NET rejects a word char immediately before the dot so example.net /
-    # shop.net TLDs do not hit (#81). ASP.NET / VB.NET stay word-bound tokens
-    # (Microsoft .NET, Learn ASP.NET). C# keeps letter-side \b.
-    (r"\bASP\.NET\b|\bVB\.NET\b|(?<!\w)\.NET\b|\bC#|\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
+    # Reject a word char immediately before .NET so example.net / shop.net
+    # TLDs do not hit (#81). ASP.NET / VB.NET / .NET still match after a
+    # space or other separator (Microsoft .NET). C# keeps letter-side \b.
+    (r"(?<!\w)(?:ASP\.NET|VB\.NET|\.NET)\b|\bC#|\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
     (r"\bSoftware\b|\bProgramming\b|\bDev\b|\bEngineering\b", ("Dev", "")),
     (r"\bAI\b|\bLLM\b|\bMachine Learning\b|\bML\b", ("AI", "")),
     (r"\bGames?\b|\bGaming\b", ("Games", "")),

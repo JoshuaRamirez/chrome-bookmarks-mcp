@@ -147,8 +147,15 @@ def classify(title, url, folder):
             if re.search(rx, folder): return tp, sb, "folder"
         for rx, (tp, sb) in FOLDER_RULES:
             if re.search(rx, folder, flags=re.IGNORECASE): return tp, sb, "folder"
+    # Longest matching suffix wins so user subdomain extends (gist.github.com)
+    # beat earlier shorter parents (github.com). Insertion order is irrelevant.
+    best = None
     for dom, (tp, sb) in D.items():
-        if h == dom or h.endswith("." + dom): return tp, sb, "domain"
+        if h == dom or h.endswith("." + dom):
+            if best is None or len(dom) > best[0]:
+                best = (len(dom), tp, sb)
+    if best is not None:
+        return best[1], best[2], "domain"
     # After domain match: short garbage on unknown / empty hosts stays junk.
     # A blanket len(t) <= 2 before this loop proposed DELETE? for HN / AI / JS / GH.
     if is_short_title_junk(title, h): return "JUNK", "", "junk"
@@ -190,6 +197,37 @@ def _self_check():
     # Real host + subdomain still classify via domain identity.
     expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"))
     expect("Docs", "https://docs.github.com/en", ("Dev", "GitHub", "domain"))
+    # Built-in longer suffix still beats a shorter parent (#71).
+    expect("AWS Docs", "https://docs.aws.amazon.com/ec2",
+           ("Dev", "Cloud", "domain"))
+    expect("AWS", "https://aws.amazon.com", ("Dev", "Cloud", "domain"))
+    expect("Amazon", "https://amazon.com", ("Shopping", "", "domain"))
+    expect("Shop", "https://shop.amazon.com/x", ("Shopping", "", "domain"))
+    # User subdomain extends win over shorter parents even when appended (#71).
+    D["gist.github.com"] = ("Dev", "Gists")
+    D["music.amazon.com"] = ("Music", "Amazon")
+    try:
+        expect("Gist", "https://gist.github.com/u/1", ("Dev", "Gists", "domain"))
+        expect("Music", "https://music.amazon.com/abc",
+               ("Music", "Amazon", "domain"))
+        # Parents and unrelated subdomains still use the built-in pair.
+        expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"))
+        expect("Docs", "https://docs.github.com/en", ("Dev", "GitHub", "domain"))
+        expect("Amazon", "https://www.amazon.com", ("Shopping", "", "domain"))
+        # Deeper host under the user key still prefers the longer suffix.
+        expect("Gist", "https://foo.gist.github.com/u/1",
+               ("Dev", "Gists", "domain"))
+    finally:
+        del D["gist.github.com"]
+        del D["music.amazon.com"]
+    # Exact-key override of an existing host still replaces the built-in pair.
+    saved = D["github.com"]
+    D["github.com"] = ("Dev", "Override")
+    try:
+        expect("GitHub", "https://github.com", ("Dev", "Override", "domain"))
+        expect("Docs", "https://docs.github.com/en", ("Dev", "Override", "domain"))
+    finally:
+        D["github.com"] = saved
     # Leading www. still strips; real hosts stay via=domain.
     expect("GitHub", "https://www.github.com", ("Dev", "GitHub", "domain"))
     expect("Amazon", "https://www.amazon.com", ("Shopping", "", "domain"))

@@ -35,17 +35,21 @@ OUT = os.environ.get("MOVES_OUT", os.path.join(os.getcwd(), "proposed-moves.tsv"
 # Travel / Music / Games? / Design / Food, plus other built-in tokens that are
 # also public TLDs: AWS, Azure, Java, Software, Engineering, Trading, Finance,
 # Shopping, Deals, Work, Recipes, Cooking) so example.dev / site.ai / foo.ml
-# do not steal via=folder (#83). Genuine Dev / AI / "ML corner" still match
-# after '/' or a space. .NET is #81 (word-char lookbehind — a left-side \b
-# before '.' is the opposite bug).
+# do not steal via=folder (#83). Same lookbehind on leftover framework / lang
+# / hidden-dir tokens (Angular / React / Vue / TypeScript / WebPack /
+# Bootstrap / Kubernetes / Docker / DevOps / Python / Golang / Rust) so
+# .angular / Button.vue / foo.python / .docker do not steal (#85). Genuine
+# Dev / AI / Vue / Docker / Python / "ML corner" still match after '/' or a
+# space. .NET is #81 (word-char lookbehind — a left-side \b before '.' is
+# the opposite bug).
 FOLDER_RULES = [
-    (r"\bWeb Dev\b|\bWeb Development\b|\bFrontend\b|\bFront-?end\b|\bAngular\b|\bReact\b|\bVue\b|\bTypeScript\b|\bWebPack\b|\bBootstrap\b", ("Dev", "Web")),
-    (r"(?<!\.)\bAWS\b|(?<!\.)\bAzure\b|(?<!\.)\bCloud\b|\bKubernetes\b|\bDocker\b|\bDevOps\b", ("Dev", "Cloud")),
+    (r"\bWeb Dev\b|\bWeb Development\b|\bFrontend\b|\bFront-?end\b|(?<!\.)\bAngular\b|(?<!\.)\bReact\b|(?<!\.)\bVue\b|(?<!\.)\bTypeScript\b|(?<!\.)\bWebPack\b|(?<!\.)\bBootstrap\b", ("Dev", "Web")),
+    (r"(?<!\.)\bAWS\b|(?<!\.)\bAzure\b|(?<!\.)\bCloud\b|(?<!\.)\bKubernetes\b|(?<!\.)\bDocker\b|(?<!\.)\bDevOps\b", ("Dev", "Cloud")),
     # Reject a word char immediately before .NET so example.net / shop.net
     # TLDs do not hit (#81). ASP.NET / VB.NET / .NET still match after a
     # space or other separator (Microsoft .NET). C# keeps letter-side \b.
     # Java is an IANA TLD (.java), same #83 class as Dev / AI / News.
-    (r"(?<!\w)(?:ASP\.NET|VB\.NET|\.NET)\b|\bC#|(?<!\.)\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
+    (r"(?<!\w)(?:ASP\.NET|VB\.NET|\.NET)\b|\bC#|(?<!\.)\bJava\b|(?<!\.)\bPython\b|(?<!\.)\bGolang\b|(?<!\.)\bRust\b", ("Dev", "Languages")),
     (r"(?<!\.)\bSoftware\b|\bProgramming\b|(?<!\.)\bDev\b|(?<!\.)\bEngineering\b", ("Dev", "")),
     (r"(?<!\.)\bAI\b|\bLLM\b|\bMachine Learning\b|(?<!\.)\bML\b", ("AI", "")),
     (r"(?<!\.)\bGames?\b|\bGaming\b", ("Games", "")),
@@ -115,11 +119,14 @@ D = {
 # stocks/recipes/flights. ChatGPT / Dockerfile are explicit so those
 # compounds still hit after \bgpt\b / \bdocker\b.
 # (?<!\.) on IANA TLD tokens so "Intro to site.ai tools" does not hit \bai\b
-# (#83). Bare titles like "AI primer" still match. Optional-s patterns are
-# split when only the plural (or only the singular) is a public TLD.
+# (#83). Same lookbehind on leftover KW tokens (react / angular / vue / css /
+# html / npm / typescript / webpack / docker / kubernetes) so "app.vue notes"
+# / "styles.css tips" / "index.html" do not steal via=keyword (#85). Bare
+# titles like "AI primer" still match. Optional-s patterns are split when
+# only the plural (or only the singular) is a public TLD.
 KW = [
-    (r"\breact\b|\bangular\b|\bvue\b|\btypescript\b|\bwebpack\b|\bcss\b|\bhtml\b|\bnode\.js\b|\bnpm\b", ("Dev", "Web")),
-    (r"\bdocker\b|\bdockerfiles?\b|\bkubernetes\b|(?<!\.)\baws\b|(?<!\.)\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
+    (r"(?<!\.)\breact\b|(?<!\.)\bangular\b|(?<!\.)\bvue\b|(?<!\.)\btypescript\b|(?<!\.)\bwebpack\b|(?<!\.)\bcss\b|(?<!\.)\bhtml\b|\bnode\.js\b|(?<!\.)\bnpm\b", ("Dev", "Web")),
+    (r"(?<!\.)\bdocker\b|\bdockerfiles?\b|(?<!\.)\bkubernetes\b|(?<!\.)\baws\b|(?<!\.)\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
     (r"(?<!\.)\bdesign patterns?\b|\barchitectures?\b|\bmicroservices?\b|\brest apis?\b|\bgraphql\b", ("Dev", "Architecture")),
     (r"\bui\b|\bux\b|(?<!\.)\bdesign systems?\b|\bfigma\b|\bwireframes?\b", ("Design", "")),
     (r"(?<!\.)\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompts?\b", ("AI", "")),
@@ -416,6 +423,41 @@ def _self_check():
            folder="Other bookmarks/example.DEV")
     expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
            folder="Other bookmarks/SITE.AI")
+    # Leftover dotted framework / lang / hidden-dir tokens must not steal
+    # a known-domain hit (#85). Same . + \b class as #83/#84.
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/.angular")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/.docker")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/Button.vue")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/App.react")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.Vue")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.python")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.rust")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.golang")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.kubernetes")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.devops")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.typescript")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.bootstrap")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.webpack")
+    # Genuine folders named Vue / Docker / Python still win via=folder.
+    expect("GitHub", "https://github.com", ("Dev", "Web", "folder"),
+           folder="Other bookmarks/Vue")
+    expect("GitHub", "https://github.com", ("Dev", "Cloud", "folder"),
+           folder="Other bookmarks/Docker")
+    expect("GitHub", "https://github.com", ("Dev", "Languages", "folder"),
+           folder="Other bookmarks/Python")
     # A genuine token later in the path still wins via=folder.
     expect("GitHub", "https://github.com", ("AI", "", "folder"),
            folder="Other bookmarks/example.dev/AI")
@@ -501,6 +543,16 @@ def _self_check():
            ("Reference", "General", "weak"))
     expect("Intro to site.jobs board", "https://unknown.example/x",
            ("Reference", "General", "weak"))
+    # Leftover dotted KW tokens must not steal via=keyword (#85).
+    expect("app.vue notes", "https://unknown.example/x",
+           ("Reference", "General", "weak"))
+    expect("styles.css tips", "https://unknown.example/x",
+           ("Reference", "General", "weak"))
+    expect("index.html", "https://unknown.example/x",
+           ("Reference", "General", "weak"))
+    # Bare KW tokens (no leading '.') still hit via=keyword.
+    expect("vue notes", "https://unknown.example/x",
+           ("Dev", "Web", "keyword"))
     # Compounds that \bgpt\b / \bdocker\b alone would miss.
     expect("ChatGPT tips", "https://example.com/c",
            ("AI", "", "keyword"))

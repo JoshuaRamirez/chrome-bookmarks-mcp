@@ -98,17 +98,21 @@ D = {
 }
 
 # ---------- neutral title-keyword rules -------------------------------------
+# Word-bounded (same \b style as FOLDER_RULES) so crypto/stock/prompt/guide
+# don't match cryptography/stockings/promptly/guidelines. Optional s? keeps
+# stocks/recipes/flights. ChatGPT / Dockerfile are explicit so those
+# compounds still hit after \bgpt\b / \bdocker\b.
 KW = [
-    (r"\breact\b|\bangular\b|\bvue\b|typescript|webpack|css\b|html\b|node\.js|npm\b", ("Dev", "Web")),
-    (r"docker|kubernetes|\baws\b|\bazure\b|terraform|serverless", ("Dev", "Cloud")),
-    (r"design pattern|architecture|microservice|rest api|graphql", ("Dev", "Architecture")),
-    (r"\bui\b|\bux\b|design system|figma|wireframe", ("Design", "")),
-    (r"\bai\b|gpt|llm|machine learning|neural|prompt", ("AI", "")),
-    (r"bitcoin|ethereum|crypto|stock|etf\b|forex|trading", ("Finance", "")),
-    (r"recipe|vegan|dinner|baking", ("Food", "")),
-    (r"flight|hotel|itinerary|travel guide", ("Travel", "")),
-    (r"resume|cover letter|job\b|hiring|career", ("Work", "")),
-    (r"tutorial|guide|how to|reference|cheat ?sheet", ("Reference", "")),
+    (r"\breact\b|\bangular\b|\bvue\b|\btypescript\b|\bwebpack\b|\bcss\b|\bhtml\b|\bnode\.js\b|\bnpm\b", ("Dev", "Web")),
+    (r"\bdocker\b|\bdockerfiles?\b|\bkubernetes\b|\baws\b|\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
+    (r"\bdesign patterns?\b|\barchitectures?\b|\bmicroservices?\b|\brest apis?\b|\bgraphql\b", ("Dev", "Architecture")),
+    (r"\bui\b|\bux\b|\bdesign systems?\b|\bfigma\b|\bwireframes?\b", ("Design", "")),
+    (r"\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompts?\b", ("AI", "")),
+    (r"\bbitcoins?\b|\bethereum\b|\bcryptos?\b|\bstocks?\b|\betfs?\b|\bforex\b|\btrading\b", ("Finance", "")),
+    (r"\brecipes?\b|\bvegan\b|\bdinners?\b|\bbaking\b", ("Food", "")),
+    (r"\bflights?\b|\bhotels?\b|\bitinerary\b|\btravel guides?\b", ("Travel", "")),
+    (r"\bresumes?\b|\bcover letters?\b|\bjobs?\b|\bhiring\b|\bcareers?\b", ("Work", "")),
+    (r"\btutorials?\b|\bguides?\b|\bhow to\b|\breferences?\b|\bcheat ?sheets?\b", ("Reference", "")),
 ]
 
 # ---------- optional local tuning: classify.rules.json (gitignored) ---------
@@ -251,6 +255,56 @@ def _self_check():
                folder="Other bookmarks/work")
     finally:
         del _USER_FOLDER_RULES[0]
+    # Title-keyword substrings must not steal via=keyword on unknown hosts (#69).
+    expect("Cryptography primer", "https://example.com/x",
+           ("Reference", "General", "weak"))
+    expect("Stockings sale", "https://shop.example.com/x",
+           ("Reference", "General", "weak"))
+    expect("Promptly delivered", "https://blog.example.com/a",
+           ("Reference", "General", "weak"))
+    expect("Guidelines for writing", "https://example.org/g",
+           ("Reference", "General", "weak"))
+    expect("Neuralgia treatment", "https://health.example.com/n",
+           ("Reference", "General", "weak"))
+    expect("Stockholm travel tips", "https://travel.example.net/s",
+           ("Reference", "General", "weak"))
+    expect("How tomatoes grow", "https://garden.example.com/t",
+           ("Reference", "General", "weak"))
+    expect("Flightless birds", "https://nature.example.com/f",
+           ("Reference", "General", "weak"))
+    # Genuine title tokens still hit via=keyword.
+    expect("Docker tutorial", "https://example.com/d",
+           ("Dev", "Cloud", "keyword"))
+    expect("stock tips", "https://example.com/s",
+           ("Finance", "", "keyword"))
+    expect("travel guide", "https://example.com/t",
+           ("Travel", "", "keyword"))
+    expect("how to brew", "https://example.com/h",
+           ("Reference", "", "keyword"))
+    # Compounds that \bgpt\b / \bdocker\b alone would miss.
+    expect("ChatGPT tips", "https://example.com/c",
+           ("AI", "", "keyword"))
+    expect("Dockerfile reference", "https://example.com/df",
+           ("Dev", "Cloud", "keyword"))
+    # Simple plurals the old substring rules already hit (s? + \b).
+    expect("Five recipes", "https://example.com/r",
+           ("Food", "", "keyword"))
+    expect("Cheap flights", "https://example.com/fl",
+           ("Travel", "", "keyword"))
+    expect("Hotels in Paris", "https://example.com/hp",
+           ("Travel", "", "keyword"))
+    expect("Python tutorials", "https://example.com/p",
+           ("Reference", "", "keyword"))
+    expect("Writing guides", "https://example.com/w",
+           ("Reference", "", "keyword"))
+    expect("Cheat sheets", "https://example.com/cs",
+           ("Reference", "", "keyword"))
+    expect("design patterns", "https://example.com/dp",
+           ("Dev", "Architecture", "keyword"))
+    expect("microservices", "https://example.com/ms",
+           ("Dev", "Architecture", "keyword"))
+    expect("stocks", "https://example.com/st",
+           ("Finance", "", "keyword"))
     print("classify self-check ok")
 
 if __name__ == "__main__":

@@ -1,0 +1,46 @@
+// Folder-path codec for slash-separated MCP paths.
+// Chrome titles may contain / and \ (e.g. "CI/CD"). Escape those inside each
+// segment so list_folders paths round-trip through splitPath / ensurePath.
+// Keep in lockstep with the copies in extension/lib/bookmarks.js.
+
+// Escape \ first, then /, so a literal backslash never masquerades as an escape.
+export function escapePathSegment(title) {
+  return String(title ?? "").replace(/\\/g, "\\\\").replace(/\//g, "\\/");
+}
+
+export function joinFolderPath(titles) {
+  return (titles || []).filter(Boolean).map(escapePathSegment).join(" / ");
+}
+
+// Split on unescaped "/", then unescape only the documented sequences
+// (\/ → /, \\ → \). A backslash before any other character, or a trailing
+// backslash, is kept as a literal so legacy paths like "foo\bar" and "foo\"
+// still name those titles. Trim each segment (so "Bookmarks bar / Dev" and
+// "Bookmarks bar/Dev" stay equivalent). Empty segments are dropped — same
+// as the old split("/").trim().filter(Boolean).
+export function splitPath(p) {
+  const s = String(p || "");
+  const out = [];
+  let buf = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") {
+      const next = s[i + 1];
+      if (next === "/" || next === "\\") {
+        buf += next;
+        i++;
+        continue;
+      }
+      buf += ch;
+      continue;
+    }
+    if (ch === "/") {
+      out.push(buf.trim());
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf.trim());
+  return out.filter(Boolean);
+}

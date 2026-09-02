@@ -13,6 +13,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Bridge } from "./bridge.js";
+import { splitPath } from "./folder-path.js";
 
 // Fallback location for an apply_moves plan when no explicit file_path is given.
 // Overridable via BOOKMARK_PLAN_FILE; otherwise a stable per-user path.
@@ -42,13 +43,12 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.10" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.11" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
-const splitPath = (p) => String(p || "").split("/").map(s => s.trim()).filter(Boolean);
 
 // Allowlist of first-segment aliases for Chrome's three permanent roots.
 // Exact match after lowercasing and collapsing whitespace — keep in lockstep
@@ -289,7 +289,7 @@ server.tool("apply_moves",
           continue;
         }
         if (!folderId.has(proposed)) {
-          const segments = proposed.split("/").map(s => s.trim()).filter(Boolean);
+          const segments = splitPath(proposed);
           if (dry_run) {
             assertPermanentRoot(segments);
             folderId.set(proposed, "(dry)");

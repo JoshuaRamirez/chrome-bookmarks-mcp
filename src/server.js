@@ -42,7 +42,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.9" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.10" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -81,9 +81,17 @@ function assertPermanentRoot(segments) {
 }
 
 // Resolve a folder target to an id: prefer parent_id, else ensure the path.
+// A provided path (including "") is never replaced by fallback — split it and
+// throw "empty path" when nothing remains, matching ensurePath / listBookmarks.
+// fallback is used only when path is null/undefined (omitted). move_bookmark
+// passes fallback=null so omit-both still returns null for its own error.
 async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
   if (parent_id) return parent_id;
-  const folder = await bridge.call("ensure_path", { path: splitPath(path || fallback) });
+  const raw = path != null ? path : fallback;
+  if (raw == null) return null;
+  const segments = splitPath(raw);
+  if (!segments.length) throw new Error("empty path");
+  const folder = await bridge.call("ensure_path", { path: segments });
   return folder.id;
 }
 

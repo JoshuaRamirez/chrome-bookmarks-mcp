@@ -24905,7 +24905,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.9" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.10" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24932,7 +24932,11 @@ function assertPermanentRoot(segments) {
 }
 async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
   if (parent_id) return parent_id;
-  const folder = await bridge.call("ensure_path", { path: splitPath(path || fallback) });
+  const raw = path != null ? path : fallback;
+  if (raw == null) return null;
+  const segments = splitPath(raw);
+  if (!segments.length) throw new Error("empty path");
+  const folder = await bridge.call("ensure_path", { path: segments });
   return folder.id;
 }
 server.tool(

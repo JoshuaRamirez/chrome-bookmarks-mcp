@@ -99,19 +99,20 @@ D = {
 
 # ---------- neutral title-keyword rules -------------------------------------
 # Word-bounded (same \b style as FOLDER_RULES) so crypto/stock/prompt/guide
-# don't match cryptography/stockings/promptly/guidelines. ChatGPT / Dockerfile
-# are explicit so those compounds still hit after \bgpt\b / \bdocker\b.
+# don't match cryptography/stockings/promptly/guidelines. Optional s? keeps
+# stocks/recipes/flights. ChatGPT / Dockerfile are explicit so those
+# compounds still hit after \bgpt\b / \bdocker\b.
 KW = [
     (r"\breact\b|\bangular\b|\bvue\b|\btypescript\b|\bwebpack\b|\bcss\b|\bhtml\b|\bnode\.js\b|\bnpm\b", ("Dev", "Web")),
-    (r"\bdocker\b|\bdockerfile\b|\bkubernetes\b|\baws\b|\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
-    (r"\bdesign pattern\b|\barchitecture\b|\bmicroservice\b|\brest api\b|\bgraphql\b", ("Dev", "Architecture")),
-    (r"\bui\b|\bux\b|\bdesign system\b|\bfigma\b|\bwireframe\b", ("Design", "")),
-    (r"\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompt\b", ("AI", "")),
-    (r"\bbitcoin\b|\bethereum\b|\bcrypto\b|\bstock\b|\betf\b|\bforex\b|\btrading\b", ("Finance", "")),
-    (r"\brecipe\b|\bvegan\b|\bdinner\b|\bbaking\b", ("Food", "")),
-    (r"\bflight\b|\bhotel\b|\bitinerary\b|\btravel guide\b", ("Travel", "")),
-    (r"\bresume\b|\bcover letter\b|\bjob\b|\bhiring\b|\bcareer\b", ("Work", "")),
-    (r"\btutorial\b|\bguide\b|\bhow to\b|\breference\b|\bcheat ?sheet\b", ("Reference", "")),
+    (r"\bdocker\b|\bdockerfiles?\b|\bkubernetes\b|\baws\b|\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
+    (r"\bdesign patterns?\b|\barchitectures?\b|\bmicroservices?\b|\brest apis?\b|\bgraphql\b", ("Dev", "Architecture")),
+    (r"\bui\b|\bux\b|\bdesign systems?\b|\bfigma\b|\bwireframes?\b", ("Design", "")),
+    (r"\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompts?\b", ("AI", "")),
+    (r"\bbitcoins?\b|\bethereum\b|\bcryptos?\b|\bstocks?\b|\betfs?\b|\bforex\b|\btrading\b", ("Finance", "")),
+    (r"\brecipes?\b|\bvegan\b|\bdinners?\b|\bbaking\b", ("Food", "")),
+    (r"\bflights?\b|\bhotels?\b|\bitinerary\b|\btravel guides?\b", ("Travel", "")),
+    (r"\bresumes?\b|\bcover letters?\b|\bjobs?\b|\bhiring\b|\bcareers?\b", ("Work", "")),
+    (r"\btutorials?\b|\bguides?\b|\bhow to\b|\breferences?\b|\bcheat ?sheets?\b", ("Reference", "")),
 ]
 
 # ---------- optional local tuning: classify.rules.json (gitignored) ---------
@@ -285,6 +286,25 @@ def _self_check():
            ("AI", "", "keyword"))
     expect("Dockerfile reference", "https://example.com/df",
            ("Dev", "Cloud", "keyword"))
+    # Simple plurals the old substring rules already hit (s? + \b).
+    expect("Five recipes", "https://example.com/r",
+           ("Food", "", "keyword"))
+    expect("Cheap flights", "https://example.com/fl",
+           ("Travel", "", "keyword"))
+    expect("Hotels in Paris", "https://example.com/hp",
+           ("Travel", "", "keyword"))
+    expect("Python tutorials", "https://example.com/p",
+           ("Reference", "", "keyword"))
+    expect("Writing guides", "https://example.com/w",
+           ("Reference", "", "keyword"))
+    expect("Cheat sheets", "https://example.com/cs",
+           ("Reference", "", "keyword"))
+    expect("design patterns", "https://example.com/dp",
+           ("Dev", "Architecture", "keyword"))
+    expect("microservices", "https://example.com/ms",
+           ("Dev", "Architecture", "keyword"))
+    expect("stocks to watch", "https://example.com/st",
+           ("Finance", "", "keyword"))
     print("classify self-check ok")
 
 if __name__ == "__main__":

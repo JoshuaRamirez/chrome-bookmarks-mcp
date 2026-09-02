@@ -119,13 +119,25 @@ KW = [
 # User folder regexes keep prior case-sensitive search (not re.IGNORECASE).
 _USER_FOLDER_RULES = []
 
-def load_user_rules():
-    path = os.path.join(HERE, "classify.rules.json")
-    if not os.path.exists(path):
-        return
-    cfg = json.load(open(path))
-    for host, pair in (cfg.get("domains") or {}).items():
-        D[host] = tuple(pair)
+def normalize_host(h):
+    h = (h or "").lower()
+    if h.startswith("www."):
+        h = h[4:]  # at most one leading www. label
+    return h[:-1] if h.endswith(".") else h  # one trailing DNS root dot
+
+def load_user_rules(cfg=None):
+    if cfg is None:
+        path = os.path.join(HERE, "classify.rules.json")
+        if not os.path.exists(path):
+            return
+        cfg = json.load(open(path))
+    # Same identity as host() so TitleCase / www. / WWW. keys override built-ins.
+    # Skip keys that normalize to "" ("." / "www.") so they cannot match host("").
+    for raw, pair in (cfg.get("domains") or {}).items():
+        key = normalize_host(raw)
+        if not key:
+            continue
+        D[key] = tuple(pair)
     for rx, pair in (cfg.get("keywords") or []):
         KW.insert(0, (rx, tuple(pair)))
     for rx, pair in (cfg.get("folders") or []):
@@ -133,10 +145,7 @@ def load_user_rules():
 
 def host(u):
     try:
-        h = (urlparse(u).hostname or "").lower()
-        if h.startswith("www."):
-            h = h[4:]  # at most one leading www. label
-        return h[:-1] if h.endswith(".") else h  # one trailing DNS root dot
+        return normalize_host(urlparse(u).hostname or "")
     except Exception: return ""
 
 def classify(title, url, folder):
@@ -228,6 +237,42 @@ def _self_check():
         expect("Docs", "https://docs.github.com/en", ("Dev", "Override", "domain"))
     finally:
         D["github.com"] = saved
+    # User domain keys share host() identity so TitleCase / www. / WWW. override (#73).
+    if normalize_host("GitHub.com") != host("https://www.github.com"):
+        raise AssertionError(("GitHub.com", normalize_host("GitHub.com"),
+                              host("https://www.github.com")))
+    if normalize_host("www.github.com") != host("https://github.com"):
+        raise AssertionError(("www.github.com", normalize_host("www.github.com"),
+                              host("https://github.com")))
+    if normalize_host("WWW.amazon.com") != host("https://www.amazon.com"):
+        raise AssertionError(("WWW.amazon.com", normalize_host("WWW.amazon.com"),
+                              host("https://www.amazon.com")))
+    saved_gh, saved_az = D["github.com"], D["amazon.com"]
+    try:
+        load_user_rules({"domains": {"GitHub.com": ["Dev", "Title"]}})
+        expect("GitHub", "https://www.github.com", ("Dev", "Title", "domain"))
+        expect("Docs", "https://docs.github.com/en", ("Dev", "Title", "domain"))
+        load_user_rules({"domains": {"www.github.com": ["Dev", "Title"]}})
+        expect("GitHub", "https://github.com", ("Dev", "Title", "domain"))
+        expect("GitHub", "https://www.github.com", ("Dev", "Title", "domain"))
+        load_user_rules({"domains": {"WWW.amazon.com": ["Shopping", "Title"]}})
+        expect("Amazon", "https://www.amazon.com", ("Shopping", "Title", "domain"))
+        expect("Shop", "https://shop.amazon.com/x", ("Shopping", "Title", "domain"))
+    finally:
+        D["github.com"] = saved_gh
+        D["amazon.com"] = saved_az
+    # Keys that normalize to "" must not insert D[""] or steal empty URLs (#73).
+    load_user_rules({"domains": {".": ["X", "Y"], "www.": ["X", "Y"]}})
+    try:
+        if "" in D:
+            raise AssertionError(("empty domain key", D[""]))
+        expect("x", "", ("JUNK", "", "junk"))
+        expect("ab", "not-a-url", ("JUNK", "", "junk"))
+        via = classify("Bookmark", "", "Other bookmarks")[2]
+        if via == "domain":
+            raise AssertionError(("", via))
+    finally:
+        D.pop("", None)
     # Leading www. still strips; real hosts stay via=domain.
     expect("GitHub", "https://www.github.com", ("Dev", "GitHub", "domain"))
     expect("Amazon", "https://www.amazon.com", ("Shopping", "", "domain"))

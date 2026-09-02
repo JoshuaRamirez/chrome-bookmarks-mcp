@@ -303,7 +303,7 @@ def _self_check():
            ("Dev", "Architecture", "keyword"))
     expect("microservices", "https://example.com/ms",
            ("Dev", "Architecture", "keyword"))
-    expect("stocks to watch", "https://example.com/st",
+    expect("stocks", "https://example.com/st",
            ("Finance", "", "keyword"))
     print("classify self-check ok")
 

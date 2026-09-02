@@ -112,6 +112,9 @@ KW = [
 ]
 
 # ---------- optional local tuning: classify.rules.json (gitignored) ---------
+# User folder regexes keep prior case-sensitive search (not re.IGNORECASE).
+_USER_FOLDER_RULES = []
+
 def load_user_rules():
     path = os.path.join(HERE, "classify.rules.json")
     if not os.path.exists(path):
@@ -122,7 +125,7 @@ def load_user_rules():
     for rx, pair in (cfg.get("keywords") or []):
         KW.insert(0, (rx, tuple(pair)))
     for rx, pair in (cfg.get("folders") or []):
-        FOLDER_RULES.insert(0, (rx, tuple(pair)))
+        _USER_FOLDER_RULES.insert(0, (rx, tuple(pair)))
 
 def host(u):
     try:
@@ -136,6 +139,8 @@ def classify(title, url, folder):
     t = (title or "").lower(); h = host(url)
     if is_junk(title, h): return "JUNK", "", "junk"
     if not re.search(r"Unsorted$", folder) and folder != "Other bookmarks":
+        for rx, (tp, sb) in _USER_FOLDER_RULES:
+            if re.search(rx, folder): return tp, sb, "folder"
         for rx, (tp, sb) in FOLDER_RULES:
             if re.search(rx, folder, flags=re.IGNORECASE): return tp, sb, "folder"
     for dom, (tp, sb) in D.items():
@@ -236,6 +241,16 @@ def _self_check():
            folder="Other bookmarks/AI")
     expect("GitHub", "https://github.com", ("Dev", "", "folder"),
            folder="Other bookmarks/Dev")
+    # User classify.rules.json folder regexes stay case-sensitive.
+    _USER_FOLDER_RULES.insert(0, (r"^Other bookmarks/Work$", ("Work", "User")))
+    try:
+        expect("GitHub", "https://github.com", ("Work", "User", "folder"),
+               folder="Other bookmarks/Work")
+        # Lowercase misses the user override; built-in \bWork\b still hits.
+        expect("GitHub", "https://github.com", ("Work", "", "folder"),
+               folder="Other bookmarks/work")
+    finally:
+        del _USER_FOLDER_RULES[0]
     print("classify self-check ok")
 
 if __name__ == "__main__":

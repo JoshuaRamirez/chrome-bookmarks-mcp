@@ -98,17 +98,20 @@ D = {
 }
 
 # ---------- neutral title-keyword rules -------------------------------------
+# Word-bounded (same \b style as FOLDER_RULES) so crypto/stock/prompt/guide
+# don't match cryptography/stockings/promptly/guidelines. ChatGPT / Dockerfile
+# are explicit so those compounds still hit after \bgpt\b / \bdocker\b.
 KW = [
-    (r"\breact\b|\bangular\b|\bvue\b|typescript|webpack|css\b|html\b|node\.js|npm\b", ("Dev", "Web")),
-    (r"docker|kubernetes|\baws\b|\bazure\b|terraform|serverless", ("Dev", "Cloud")),
-    (r"design pattern|architecture|microservice|rest api|graphql", ("Dev", "Architecture")),
-    (r"\bui\b|\bux\b|design system|figma|wireframe", ("Design", "")),
-    (r"\bai\b|gpt|llm|machine learning|neural|prompt", ("AI", "")),
-    (r"bitcoin|ethereum|crypto|stock|etf\b|forex|trading", ("Finance", "")),
-    (r"recipe|vegan|dinner|baking", ("Food", "")),
-    (r"flight|hotel|itinerary|travel guide", ("Travel", "")),
-    (r"resume|cover letter|job\b|hiring|career", ("Work", "")),
-    (r"tutorial|guide|how to|reference|cheat ?sheet", ("Reference", "")),
+    (r"\breact\b|\bangular\b|\bvue\b|\btypescript\b|\bwebpack\b|\bcss\b|\bhtml\b|\bnode\.js\b|\bnpm\b", ("Dev", "Web")),
+    (r"\bdocker\b|\bdockerfile\b|\bkubernetes\b|\baws\b|\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
+    (r"\bdesign pattern\b|\barchitecture\b|\bmicroservice\b|\brest api\b|\bgraphql\b", ("Dev", "Architecture")),
+    (r"\bui\b|\bux\b|\bdesign system\b|\bfigma\b|\bwireframe\b", ("Design", "")),
+    (r"\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompt\b", ("AI", "")),
+    (r"\bbitcoin\b|\bethereum\b|\bcrypto\b|\bstock\b|\betf\b|\bforex\b|\btrading\b", ("Finance", "")),
+    (r"\brecipe\b|\bvegan\b|\bdinner\b|\bbaking\b", ("Food", "")),
+    (r"\bflight\b|\bhotel\b|\bitinerary\b|\btravel guide\b", ("Travel", "")),
+    (r"\bresume\b|\bcover letter\b|\bjob\b|\bhiring\b|\bcareer\b", ("Work", "")),
+    (r"\btutorial\b|\bguide\b|\bhow to\b|\breference\b|\bcheat ?sheet\b", ("Reference", "")),
 ]
 
 # ---------- optional local tuning: classify.rules.json (gitignored) ---------
@@ -251,6 +254,37 @@ def _self_check():
                folder="Other bookmarks/work")
     finally:
         del _USER_FOLDER_RULES[0]
+    # Title-keyword substrings must not steal via=keyword on unknown hosts (#69).
+    expect("Cryptography primer", "https://example.com/x",
+           ("Reference", "General", "weak"))
+    expect("Stockings sale", "https://shop.example.com/x",
+           ("Reference", "General", "weak"))
+    expect("Promptly delivered", "https://blog.example.com/a",
+           ("Reference", "General", "weak"))
+    expect("Guidelines for writing", "https://example.org/g",
+           ("Reference", "General", "weak"))
+    expect("Neuralgia treatment", "https://health.example.com/n",
+           ("Reference", "General", "weak"))
+    expect("Stockholm travel tips", "https://travel.example.net/s",
+           ("Reference", "General", "weak"))
+    expect("How tomatoes grow", "https://garden.example.com/t",
+           ("Reference", "General", "weak"))
+    expect("Flightless birds", "https://nature.example.com/f",
+           ("Reference", "General", "weak"))
+    # Genuine title tokens still hit via=keyword.
+    expect("Docker tutorial", "https://example.com/d",
+           ("Dev", "Cloud", "keyword"))
+    expect("stock tips", "https://example.com/s",
+           ("Finance", "", "keyword"))
+    expect("travel guide", "https://example.com/t",
+           ("Travel", "", "keyword"))
+    expect("how to brew", "https://example.com/h",
+           ("Reference", "", "keyword"))
+    # Compounds that \bgpt\b / \bdocker\b alone would miss.
+    expect("ChatGPT tips", "https://example.com/c",
+           ("AI", "", "keyword"))
+    expect("Dockerfile reference", "https://example.com/df",
+           ("Dev", "Cloud", "keyword"))
     print("classify self-check ok")
 
 if __name__ == "__main__":

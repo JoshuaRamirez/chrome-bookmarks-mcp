@@ -33,9 +33,10 @@ OUT = os.environ.get("MOVES_OUT", os.path.join(os.getcwd(), "proposed-moves.tsv"
 FOLDER_RULES = [
     (r"\bWeb Dev\b|\bWeb Development\b|\bFrontend\b|\bFront-?end\b|\bAngular\b|\bReact\b|\bVue\b|\bTypeScript\b|\bWebPack\b|\bBootstrap\b", ("Dev", "Web")),
     (r"\bAWS\b|\bAzure\b|\bCloud\b|\bKubernetes\b|\bDocker\b|\bDevOps\b", ("Dev", "Cloud")),
-    # .NET is segment-anchored so example.net / shop.net TLDs do not hit (#81).
-    # ASP.NET / VB.NET / .NET still match at a / boundary; C# keeps letter-side \b.
-    (r"(?:^|/)(?:ASP\.NET|VB\.NET|\.NET)\b|\bC#|\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
+    # Bare .NET rejects a word char immediately before the dot so example.net /
+    # shop.net TLDs do not hit (#81). ASP.NET / VB.NET stay word-bound tokens
+    # (Microsoft .NET, Learn ASP.NET). C# keeps letter-side \b.
+    (r"\bASP\.NET\b|\bVB\.NET\b|(?<!\w)\.NET\b|\bC#|\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
     (r"\bSoftware\b|\bProgramming\b|\bDev\b|\bEngineering\b", ("Dev", "")),
     (r"\bAI\b|\bLLM\b|\bMachine Learning\b|\bML\b", ("AI", "")),
     (r"\bGames?\b|\bGaming\b", ("Games", "")),
@@ -355,6 +356,13 @@ def _self_check():
            folder="Other bookmarks/ASP.NET Core")
     expect("GitHub", "https://github.com", ("Dev", "Languages", "folder"),
            folder="Other bookmarks/.net")
+    # Descriptive prefixes still match, same as other token folder rules.
+    expect("GitHub", "https://github.com", ("Dev", "Languages", "folder"),
+           folder="Other bookmarks/Microsoft .NET")
+    expect("GitHub", "https://github.com", ("Dev", "Languages", "folder"),
+           folder="Other bookmarks/Learn ASP.NET")
+    expect("GitHub", "https://github.com", ("Dev", "Languages", "folder"),
+           folder="Other bookmarks/Visual Basic VB.NET")
     # Unsorted holding folders skip folder rules so domain/keyword can run (#79).
     # Last segment is case-insensitive; TitleCase and variants all skip.
     expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),

@@ -30,24 +30,34 @@ OUT = os.environ.get("MOVES_OUT", os.path.join(os.getcwd(), "proposed-moves.tsv"
 # ---------- neutral starter taxonomy: existing folder name -> (top, sub) ----
 # Matched case-insensitively with KW-style word boundaries so path tokens like
 # News / AI / Dev / Articles hit, but DETAILS / Newspaper / JavaScript do not.
+# '.' is non-word, so \b fires between a TLD dot and the next label. Reject a
+# '.' immediately before IANA TLD tokens (Dev / AI / ML / News / Cloud / Art /
+# Travel / Music / Games? / Design / Food, plus other built-in tokens that are
+# also public TLDs: AWS, Azure, Java, Software, Engineering, Trading, Finance,
+# Shopping, Deals, Work, Recipes, Cooking) so example.dev / site.ai / foo.ml
+# do not steal via=folder (#83). Genuine Dev / AI / "ML corner" still match
+# after '/' or a space. .NET is #81 (word-char lookbehind — a left-side \b
+# before '.' is the opposite bug).
 FOLDER_RULES = [
     (r"\bWeb Dev\b|\bWeb Development\b|\bFrontend\b|\bFront-?end\b|\bAngular\b|\bReact\b|\bVue\b|\bTypeScript\b|\bWebPack\b|\bBootstrap\b", ("Dev", "Web")),
-    (r"\bAWS\b|\bAzure\b|\bCloud\b|\bKubernetes\b|\bDocker\b|\bDevOps\b", ("Dev", "Cloud")),
+    (r"(?<!\.)\bAWS\b|(?<!\.)\bAzure\b|(?<!\.)\bCloud\b|\bKubernetes\b|\bDocker\b|\bDevOps\b", ("Dev", "Cloud")),
     # Reject a word char immediately before .NET so example.net / shop.net
     # TLDs do not hit (#81). ASP.NET / VB.NET / .NET still match after a
     # space or other separator (Microsoft .NET). C# keeps letter-side \b.
-    (r"(?<!\w)(?:ASP\.NET|VB\.NET|\.NET)\b|\bC#|\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
-    (r"\bSoftware\b|\bProgramming\b|\bDev\b|\bEngineering\b", ("Dev", "")),
-    (r"\bAI\b|\bLLM\b|\bMachine Learning\b|\bML\b", ("AI", "")),
-    (r"\bGames?\b|\bGaming\b", ("Games", "")),
-    (r"\bCrypto\b|\bTrading\b|\bStocks\b|\bFinance\b|\bInvesting\b", ("Finance", "")),
-    (r"\bShopping\b|\bDeals\b|\bWishlist\b", ("Shopping", "")),
-    (r"\bWork\b|\bProjects\b", ("Work", "")),
-    (r"\bRecipes?\b|\bFood\b|\bCooking\b", ("Food", "")),
-    (r"\bTravel\b|\bTrips\b|\bVacation\b", ("Travel", "")),
-    (r"\bNews\b|\bPolitics\b", ("News", "")),
-    (r"\bMusic\b", ("Music", "")),
-    (r"\bDesign\b|\bArt\b|\bInspiration\b", ("Design", "")),
+    # Java is an IANA TLD (.java), same #83 class as Dev / AI / News.
+    (r"(?<!\w)(?:ASP\.NET|VB\.NET|\.NET)\b|\bC#|(?<!\.)\bJava\b|\bPython\b|\bGolang\b|\bRust\b", ("Dev", "Languages")),
+    (r"(?<!\.)\bSoftware\b|\bProgramming\b|(?<!\.)\bDev\b|(?<!\.)\bEngineering\b", ("Dev", "")),
+    (r"(?<!\.)\bAI\b|\bLLM\b|\bMachine Learning\b|(?<!\.)\bML\b", ("AI", "")),
+    (r"(?<!\.)\bGames?\b|\bGaming\b", ("Games", "")),
+    (r"\bCrypto\b|(?<!\.)\bTrading\b|\bStocks\b|(?<!\.)\bFinance\b|\bInvesting\b", ("Finance", "")),
+    (r"(?<!\.)\bShopping\b|(?<!\.)\bDeals\b|\bWishlist\b", ("Shopping", "")),
+    (r"(?<!\.)\bWork\b|\bProjects\b", ("Work", "")),
+    # .recipes is an IANA TLD; .recipe is not — keep bare Recipe matching.
+    (r"\bRecipe\b|(?<!\.)\bRecipes\b|(?<!\.)\bFood\b|(?<!\.)\bCooking\b", ("Food", "")),
+    (r"(?<!\.)\bTravel\b|\bTrips\b|\bVacation\b", ("Travel", "")),
+    (r"(?<!\.)\bNews\b|\bPolitics\b", ("News", "")),
+    (r"(?<!\.)\bMusic\b", ("Music", "")),
+    (r"(?<!\.)\bDesign\b|(?<!\.)\bArt\b|\bInspiration\b", ("Design", "")),
     (r"\bReading\b|\bArticles\b|\bReference\b|\bLearning\b", ("Reference", "")),
     (r"\bPersonal\b", ("Personal", "")),
 ]
@@ -104,17 +114,20 @@ D = {
 # don't match cryptography/stockings/promptly/guidelines. Optional s? keeps
 # stocks/recipes/flights. ChatGPT / Dockerfile are explicit so those
 # compounds still hit after \bgpt\b / \bdocker\b.
+# (?<!\.) on IANA TLD tokens so "Intro to site.ai tools" does not hit \bai\b
+# (#83). Bare titles like "AI primer" still match. Optional-s patterns are
+# split when only the plural (or only the singular) is a public TLD.
 KW = [
     (r"\breact\b|\bangular\b|\bvue\b|\btypescript\b|\bwebpack\b|\bcss\b|\bhtml\b|\bnode\.js\b|\bnpm\b", ("Dev", "Web")),
-    (r"\bdocker\b|\bdockerfiles?\b|\bkubernetes\b|\baws\b|\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
-    (r"\bdesign patterns?\b|\barchitectures?\b|\bmicroservices?\b|\brest apis?\b|\bgraphql\b", ("Dev", "Architecture")),
-    (r"\bui\b|\bux\b|\bdesign systems?\b|\bfigma\b|\bwireframes?\b", ("Design", "")),
-    (r"\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompts?\b", ("AI", "")),
-    (r"\bbitcoins?\b|\bethereum\b|\bcryptos?\b|\bstocks?\b|\betfs?\b|\bforex\b|\btrading\b", ("Finance", "")),
-    (r"\brecipes?\b|\bvegan\b|\bdinners?\b|\bbaking\b", ("Food", "")),
-    (r"\bflights?\b|\bhotels?\b|\bitinerary\b|\btravel guides?\b", ("Travel", "")),
-    (r"\bresumes?\b|\bcover letters?\b|\bjobs?\b|\bhiring\b|\bcareers?\b", ("Work", "")),
-    (r"\btutorials?\b|\bguides?\b|\bhow to\b|\breferences?\b|\bcheat ?sheets?\b", ("Reference", "")),
+    (r"\bdocker\b|\bdockerfiles?\b|\bkubernetes\b|(?<!\.)\baws\b|(?<!\.)\bazure\b|\bterraform\b|\bserverless\b", ("Dev", "Cloud")),
+    (r"(?<!\.)\bdesign patterns?\b|\barchitectures?\b|\bmicroservices?\b|\brest apis?\b|\bgraphql\b", ("Dev", "Architecture")),
+    (r"\bui\b|\bux\b|(?<!\.)\bdesign systems?\b|\bfigma\b|\bwireframes?\b", ("Design", "")),
+    (r"(?<!\.)\bai\b|\bgpt\b|\bchatgpt\b|\bllm\b|\bmachine learning\b|\bneural\b|\bprompts?\b", ("AI", "")),
+    (r"\bbitcoins?\b|\bethereum\b|\bcryptos?\b|\bstocks?\b|\betfs?\b|(?<!\.)\bforex\b|(?<!\.)\btrading\b", ("Finance", "")),
+    (r"\brecipe\b|(?<!\.)\brecipes\b|\bvegan\b|\bdinners?\b|\bbaking\b", ("Food", "")),
+    (r"\bflight\b|(?<!\.)\bflights\b|\bhotel\b|(?<!\.)\bhotels\b|\bitinerary\b|(?<!\.)\btravel guides?\b", ("Travel", "")),
+    (r"\bresumes?\b|\bcover letters?\b|\bjob\b|(?<!\.)\bjobs\b|\bhiring\b|(?<!\.)\bcareers?\b", ("Work", "")),
+    (r"\btutorials?\b|(?<!\.)\bguide\b|\bguides\b|(?<!\.)\bhow to\b|\breferences?\b|\bcheat ?sheets?\b", ("Reference", "")),
 ]
 
 # ---------- optional local tuning: classify.rules.json (gitignored) ---------
@@ -363,6 +376,66 @@ def _self_check():
            folder="Other bookmarks/Learn ASP.NET")
     expect("GitHub", "https://github.com", ("Dev", "Languages", "folder"),
            folder="Other bookmarks/Visual Basic VB.NET")
+    # Dotted IANA TLD folder segments must not steal a known-domain hit (#83).
+    # Same . + \b class as #81 (*.net); these are bare taxonomy tokens.
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/example.dev")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/site.ai")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/something.ai")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/foo.ml")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/daily.news")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/team.cloud")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/photo.art")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/go.travel")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/listen.music")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/play.games")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/play.game")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/ux.design")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/best.food")
+    # Other built-in tokens that are also public TLDs (same class).
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/corp.aws")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/src.java")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/desk.work")
+    # IGNORECASE still treats a dotted TLD as a TLD, not a taxonomy token.
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/example.DEV")
+    expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
+           folder="Other bookmarks/SITE.AI")
+    # A genuine token later in the path still wins via=folder.
+    expect("GitHub", "https://github.com", ("AI", "", "folder"),
+           folder="Other bookmarks/example.dev/AI")
+    # Genuine short-token folders still win via=folder (case-insensitive).
+    expect("GitHub", "https://github.com", ("Dev", "Cloud", "folder"),
+           folder="Other bookmarks/Cloud")
+    expect("GitHub", "https://github.com", ("Design", "", "folder"),
+           folder="Other bookmarks/Art")
+    expect("GitHub", "https://github.com", ("AI", "", "folder"),
+           folder="Other bookmarks/ML corner")
+    expect("GitHub", "https://github.com", ("Music", "", "folder"),
+           folder="Other bookmarks/Music")
+    expect("GitHub", "https://github.com", ("Travel", "", "folder"),
+           folder="Other bookmarks/Travel")
+    expect("GitHub", "https://github.com", ("Games", "", "folder"),
+           folder="Other bookmarks/Games")
+    expect("GitHub", "https://github.com", ("Design", "", "folder"),
+           folder="Other bookmarks/Design")
+    expect("GitHub", "https://github.com", ("Food", "", "folder"),
+           folder="Other bookmarks/Food")
     # Unsorted holding folders skip folder rules so domain/keyword can run (#79).
     # Last segment is case-insensitive; TitleCase and variants all skip.
     expect("GitHub", "https://github.com", ("Dev", "GitHub", "domain"),
@@ -421,6 +494,13 @@ def _self_check():
            ("Travel", "", "keyword"))
     expect("how to brew", "https://example.com/h",
            ("Reference", "", "keyword"))
+    expect("AI primer", "https://unknown.example/x",
+           ("AI", "", "keyword"))
+    # Dotted TLD in a title must not hit \bai\b / other IANA KW tokens (#83).
+    expect("Intro to site.ai tools", "https://unknown.example/x",
+           ("Reference", "General", "weak"))
+    expect("Intro to site.jobs board", "https://unknown.example/x",
+           ("Reference", "General", "weak"))
     # Compounds that \bgpt\b / \bdocker\b alone would miss.
     expect("ChatGPT tips", "https://example.com/c",
            ("AI", "", "keyword"))

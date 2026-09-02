@@ -24894,6 +24894,7 @@ var Bridge = class {
 // src/folder-path.js
 function splitPath(p) {
   const s = String(p || "");
+  if (!s.trim()) return [];
   const out = [];
   let buf = "";
   for (let i = 0; i < s.length; i++) {
@@ -24909,13 +24910,15 @@ function splitPath(p) {
       continue;
     }
     if (ch === "/") {
-      out.push(buf.trim());
+      if (buf.endsWith(" ")) buf = buf.slice(0, -1);
+      out.push(buf);
       buf = "";
+      if (s[i + 1] === " ") i++;
       continue;
     }
     buf += ch;
   }
-  out.push(buf.trim());
+  out.push(buf);
   return out.filter(Boolean);
 }
 
@@ -24933,7 +24936,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.11" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.12" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });

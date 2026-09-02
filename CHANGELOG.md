@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.12]
+
+### Fixed
+- Folder paths now round-trip when a title has leading or trailing spaces
+  (e.g. ` Dev` vs `Dev` vs `Dev `). `splitPath` strips at most one space of
+  ` / ` separator padding instead of `.trim()` on each segment, so
+  `list_folders` paths resolve to that folder instead of a trimmed sibling.
+  `list_bookmarks` prefix-compares case-insensitively without trimming live
+  titles, so scoped lists no longer merge edge-space siblings. Slash and
+  backslash escaping from 1.1.11 is unchanged.
+
 ## [1.1.11]
 
 ### Fixed

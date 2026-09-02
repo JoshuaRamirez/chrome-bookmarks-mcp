@@ -30,6 +30,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 //         "Nested CD" https://cd.example              (410)
 //     foo\bar(50)                <- title contains "\"
 //       "Slash"     https://backslash.example         (500)
+//     " Dev"(60)                 <- leading space (≠ Dev)
+//       "Lead"      https://lead.example              (600)
+//     "Dev "(70)                 <- trailing space (≠ Dev)
+//       "Trail"     https://trail.example             (700)
 //   Other bookmarks(2)
 //     News(20)
 //       "HN"        https://news.ycombinator.com      (200)
@@ -55,6 +59,12 @@ const TREE = {
       ] },
       { id: "50", title: "foo\\bar", parentId: "1", children: [
         { id: "500", title: "Slash", url: "https://backslash.example", parentId: "50" },
+      ] },
+      { id: "60", title: " Dev", parentId: "1", children: [
+        { id: "600", title: "Lead", url: "https://lead.example", parentId: "60" },
+      ] },
+      { id: "70", title: "Dev ", parentId: "1", children: [
+        { id: "700", title: "Trail", url: "https://trail.example", parentId: "70" },
       ] },
     ] },
     { id: "2", title: "Other bookmarks", parentId: "0", children: [
@@ -124,7 +134,7 @@ function check(name, cond, detail) {
 }
 
 const stats = await BookmarkStore.stats();
-check("stats counts folders and urls", stats.folders === 9 && stats.urls === 9, JSON.stringify(stats));
+check("stats counts folders and urls", stats.folders === 11 && stats.urls === 11, JSON.stringify(stats));
 
 const folders = await BookmarkStore.listFolders();
 const devPath = folders.find((f) => f.id === "10")?.path;
@@ -159,7 +169,7 @@ check("searchWithPaths omits folder hits and keeps bookmark folder path",
 
 const all = await BookmarkStore.listBookmarks();
 check("listBookmarks returns a flat list of all bookmarks with folders",
-  all.length === 9 && all.every((b) => b.id && b.url && b.folder),
+  all.length === 11 && all.every((b) => b.id && b.url && b.folder),
   JSON.stringify(all));
 
 const scoped = await BookmarkStore.listBookmarks("Bookmarks bar/Dev");
@@ -317,6 +327,66 @@ const searchJenkins = await BookmarkStore.searchWithPaths("Jenkins");
 check("searchWithPaths emits escaped folder paths for slash titles",
   searchJenkins.length === 1 && searchJenkins[0].folder === "Bookmarks bar / CI\\/CD",
   JSON.stringify(searchJenkins));
+
+// --- leading / trailing title spaces: emit → splitPath → that folder --------
+check("splitPath keeps title-edge spaces (not full-segment trim)",
+  JSON.stringify(splitPath("Bookmarks bar /  Dev")) === JSON.stringify(["Bookmarks bar", " Dev"]) &&
+  JSON.stringify(splitPath("Bookmarks bar / Dev ")) === JSON.stringify(["Bookmarks bar", "Dev "]) &&
+  JSON.stringify(splitPath("Bookmarks bar / Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]) &&
+  JSON.stringify(splitPath("Bookmarks bar/Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]),
+  JSON.stringify({
+    lead: splitPath("Bookmarks bar /  Dev"),
+    trail: splitPath("Bookmarks bar / Dev "),
+    padded: splitPath("Bookmarks bar / Dev"),
+    compact: splitPath("Bookmarks bar/Dev"),
+  }));
+
+check("splitPath keeps a title-edge tab (does not trim tabs as separator padding)",
+  JSON.stringify(splitPath("Bookmarks bar / \tDev")) === JSON.stringify(["Bookmarks bar", "\tDev"]),
+  JSON.stringify(splitPath("Bookmarks bar / \tDev")));
+
+const leadFolder = folders.find((f) => f.id === "60");
+const trailFolder = folders.find((f) => f.id === "70");
+check("listFolders emits paths that preserve leading/trailing title spaces",
+  leadFolder?.path === "Bookmarks bar /  Dev" &&
+  trailFolder?.path === "Bookmarks bar / Dev ",
+  JSON.stringify({ lead: leadFolder?.path, trail: trailFolder?.path }));
+
+check("listFolders edge-space paths round-trip through splitPath to that folder (not sibling Dev)",
+  JSON.stringify(splitPath(leadFolder?.path)) === JSON.stringify(["Bookmarks bar", " Dev"]) &&
+  resolveBySegments(splitPath(leadFolder?.path))?.id === "60" &&
+  JSON.stringify(splitPath(trailFolder?.path)) === JSON.stringify(["Bookmarks bar", "Dev "]) &&
+  resolveBySegments(splitPath(trailFolder?.path))?.id === "70" &&
+  resolveBySegments(splitPath("Bookmarks bar / Dev"))?.id === "10" &&
+  resolveBySegments(splitPath("Bookmarks bar/Dev"))?.id === "10",
+  JSON.stringify({
+    leadSegs: splitPath(leadFolder?.path),
+    trailSegs: splitPath(trailFolder?.path),
+    padded: resolveBySegments(splitPath("Bookmarks bar / Dev"))?.id,
+  }));
+
+const leadHits = await BookmarkStore.listBookmarks(leadFolder?.path);
+check("listBookmarks on a leading-space title path does not merge Dev or Dev ",
+  leadHits.length === 1 &&
+  leadHits[0].id === "600" &&
+  leadHits[0].folder === "Bookmarks bar /  Dev" &&
+  leadHits.every((b) => b.id !== "100" && b.id !== "101" && b.id !== "700"),
+  JSON.stringify(leadHits));
+
+const trailHits = await BookmarkStore.listBookmarks(trailFolder?.path);
+check("listBookmarks on a trailing-space title path does not merge Dev or  Dev",
+  trailHits.length === 1 &&
+  trailHits[0].id === "700" &&
+  trailHits[0].folder === "Bookmarks bar / Dev " &&
+  trailHits.every((b) => b.id !== "100" && b.id !== "101" && b.id !== "600"),
+  JSON.stringify(trailHits));
+
+const exactDev = await BookmarkStore.listBookmarks("Bookmarks bar/Dev");
+check("listBookmarks Bookmarks bar/Dev does not merge edge-space siblings",
+  exactDev.length === 2 &&
+  exactDev.every((b) => b.folder === "Bookmarks bar / Dev") &&
+  exactDev.every((b) => b.id !== "600" && b.id !== "700"),
+  JSON.stringify(exactDev));
 
 console.log(failed ? `\nBOOKMARKSTORE TESTS FAILED (${failed})` : "\nBOOKMARKSTORE TESTS PASSED");
 process.exit(failed ? 1 : 0);

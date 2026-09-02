@@ -6,7 +6,9 @@
 
 // Path codec — keep in lockstep with src/folder-path.js.
 // Escape \ then / in each title so "A / B / C" paths round-trip when a title
-// contains / or \. splitPath is the inverse: split on unescaped /, unescape.
+// contains / or \. splitPath is the inverse: split on unescaped /, unescape,
+// and drop at most one space of " / " separator padding (not .trim(), so
+// title-edge spaces and tabs survive).
 function escapePathSegment(title) {
   return String(title ?? "").replace(/\\/g, "\\\\").replace(/\//g, "\\/");
 }
@@ -15,6 +17,7 @@ function joinFolderPath(titles) {
 }
 function splitPath(p) {
   const s = String(p || "");
+  if (!s.trim()) return [];
   const out = [];
   let buf = "";
   for (let i = 0; i < s.length; i++) {
@@ -30,13 +33,15 @@ function splitPath(p) {
       continue;
     }
     if (ch === "/") {
-      out.push(buf.trim());
+      if (buf.endsWith(" ")) buf = buf.slice(0, -1);
+      out.push(buf);
       buf = "";
+      if (s[i + 1] === " ") i++;
       continue;
     }
     buf += ch;
   }
-  out.push(buf.trim());
+  out.push(buf);
   return out.filter(Boolean);
 }
 
@@ -122,8 +127,9 @@ class BookmarkStore {
   // folder_path compare is case-insensitive on real title segments (splitPath
   // unescapes; no join→re-split) so "bookmarks bar/dev" and USAGE
   // "Other Bookmarks" match Chrome titles, and a title like "CI/CD" is one
-  // segment. Emitted `folder` keeps Chrome's casing with / and \ escaped so
-  // the string round-trips through splitPath. No short-alias expansion.
+  // segment. Live titles are casefolded only — not trimmed — so " Dev" ≠ "Dev".
+  // Emitted `folder` keeps Chrome's casing with / and \ escaped so the string
+  // round-trips through splitPath. No short-alias expansion.
   // A provided folderPath that normalizes to empty ("/", "///", whitespace)
   // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
   // / null) still lists everything.
@@ -139,7 +145,7 @@ class BookmarkStore {
       const titles = path.filter(Boolean);
       const folder = joinFolderPath(titles) || "(root)";
       if (prefixSegs) {
-        const key = titles.map((s) => String(s).trim().toLowerCase());
+        const key = titles.map((s) => String(s).toLowerCase());
         if (key.length < prefixSegs.length || !prefixSegs.every((s, i) => s === key[i])) return;
       }
       out.push({ id: node.id, title: node.title, url: node.url, folder });

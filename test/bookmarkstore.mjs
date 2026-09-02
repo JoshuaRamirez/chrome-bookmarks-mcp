@@ -240,6 +240,18 @@ check("splitPath treats escaped / and \\ as title characters",
     bs: splitPath("Bookmarks bar / foo\\\\bar"),
   }));
 
+check("splitPath keeps a trailing backslash as a literal (and \\\\ still unescapes)",
+  JSON.stringify(splitPath("Bookmarks bar / foo\\")) === JSON.stringify(["Bookmarks bar", "foo\\"]) &&
+  JSON.stringify(splitPath("Bookmarks bar / foo\\\\")) === JSON.stringify(["Bookmarks bar", "foo\\"]),
+  JSON.stringify({
+    trailing: splitPath("Bookmarks bar / foo\\"),
+    escaped: splitPath("Bookmarks bar / foo\\\\"),
+  }));
+
+check("splitPath keeps a legacy unescaped backslash before a non-escape character",
+  JSON.stringify(splitPath("Bookmarks bar/foo\\bar")) === JSON.stringify(["Bookmarks bar", "foo\\bar"]),
+  JSON.stringify(splitPath("Bookmarks bar/foo\\bar")));
+
 check("splitPath still drops empty segments (empty path)",
   JSON.stringify(splitPath("/")) === "[]" &&
   JSON.stringify(splitPath("///")) === "[]" &&
@@ -295,6 +307,11 @@ const bsHits = await BookmarkStore.listBookmarks(bsFolder?.path);
 check("listBookmarks scopes a backslash title via its escaped list_folders path",
   bsHits.length === 1 && bsHits[0].id === "500" && bsHits[0].folder === "Bookmarks bar / foo\\\\bar",
   JSON.stringify(bsHits));
+
+const legacyBs = await BookmarkStore.listBookmarks("Bookmarks bar/foo\\bar");
+check("listBookmarks accepts a legacy unescaped backslash path",
+  legacyBs.length === 1 && legacyBs[0].id === "500",
+  JSON.stringify(legacyBs));
 
 const searchJenkins = await BookmarkStore.searchWithPaths("Jenkins");
 check("searchWithPaths emits escaped folder paths for slash titles",

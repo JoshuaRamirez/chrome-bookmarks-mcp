@@ -12,9 +12,12 @@ export function joinFolderPath(titles) {
   return (titles || []).filter(Boolean).map(escapePathSegment).join(" / ");
 }
 
-// Split on unescaped "/", then unescape \X → X. Trim each segment (so
-// "Bookmarks bar / Dev" and "Bookmarks bar/Dev" stay equivalent). Empty
-// segments are dropped — same as the old split("/").trim().filter(Boolean).
+// Split on unescaped "/", then unescape only the documented sequences
+// (\/ → /, \\ → \). A backslash before any other character, or a trailing
+// backslash, is kept as a literal so legacy paths like "foo\bar" and "foo\"
+// still name those titles. Trim each segment (so "Bookmarks bar / Dev" and
+// "Bookmarks bar/Dev" stay equivalent). Empty segments are dropped — same
+// as the old split("/").trim().filter(Boolean).
 export function splitPath(p) {
   const s = String(p || "");
   const out = [];
@@ -22,7 +25,13 @@ export function splitPath(p) {
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (ch === "\\") {
-      if (i + 1 < s.length) buf += s[++i];
+      const next = s[i + 1];
+      if (next === "/" || next === "\\") {
+        buf += next;
+        i++;
+        continue;
+      }
+      buf += ch;
       continue;
     }
     if (ch === "/") {

@@ -20,7 +20,13 @@ function splitPath(p) {
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (ch === "\\") {
-      if (i + 1 < s.length) buf += s[++i];
+      const next = s[i + 1];
+      if (next === "/" || next === "\\") {
+        buf += next;
+        i++;
+        continue;
+      }
+      buf += ch;
       continue;
     }
     if (ch === "/") {

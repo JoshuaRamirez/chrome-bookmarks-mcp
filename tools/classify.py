@@ -56,7 +56,9 @@ def is_junk(title, host):
     t = (title or "").strip().lower()
     if t in JUNK_TITLES: return True
     if host in JUNK_HOSTS: return True
-    if len(t) <= 2: return True
+    # Short titles are junk only when there is no meaningful host. A blanket
+    # len(t) <= 2 fired before domain match and proposed DELETE? for real
+    # bookmarks titled HN / AI / JS / GH on well-known URLs.
     if host == "" and len(t) < 4: return True
     return False
 
@@ -177,6 +179,17 @@ def _self_check():
     # FQDN with one trailing DNS root dot still matches.
     expect("GitHub", "https://github.com./x", ("Dev", "GitHub", "domain"))
     expect("Docs", "https://docs.github.com./en", ("Dev", "GitHub", "domain"))
+    # Short real titles on well-known hosts must still hit domain, not junk.
+    expect("HN", "https://news.ycombinator.com", ("News", "", "domain"))
+    expect("AI", "https://openai.com", ("AI", "", "domain"))
+    expect("JS", "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+           ("Dev", "Web", "domain"))
+    expect("GH", "https://github.com", ("Dev", "GitHub", "domain"))
+    # Explicit junk lists stay first; short garbage still junk with no host.
+    expect("untitled", "https://github.com", ("JUNK", "", "junk"))
+    expect("GitHub", "https://localhost", ("JUNK", "", "junk"))
+    expect("x", "", ("JUNK", "", "junk"))
+    expect("ab", "not-a-url", ("JUNK", "", "junk"))
     # Substring / suffix-injection / middle-label www. hosts must not.
     for url in ("https://notgithub.com", "https://github.com.evil.com",
                 "https://myamazon.com", "https://xxbbc.com",

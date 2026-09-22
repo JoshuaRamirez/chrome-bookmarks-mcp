@@ -1,7 +1,8 @@
 // Contract test: write tools that go through resolveFolder must reject a
 // provided empty folder path ("") with "empty path", and a provided empty
-// folder id (parent_id / to_parent_id / into_parent_id "") with "empty parent
-// id". They must not treat "" as omit and silently land on the default root.
+// folder id (parent_id / to_parent_id / into_parent_id "" or whitespace-only)
+// with "empty parent id". They must not treat those as omit and silently land
+// on the default root.
 // Omitting the path still attempts the fallback (bridge not connected here).
 // move_bookmark with both destination args omitted still says to provide
 // to_path / to_parent_id. No Chrome required — empty path and empty id throw
@@ -64,6 +65,9 @@ send(7, "add_bookmark", { title: "X", url: "https://example.test", parent_id: ""
 send(8, "create_folder", { name: "X", parent_id: "" });
 send(9, "move_bookmark", { id: "1", to_parent_id: "" });
 send(10, "import_json", { file_path: importFile, into_parent_id: "" });
+send(11, "add_bookmark", { title: "X", url: "https://example.test", parent_id: "   " });
+send(12, "move_bookmark", { id: "1", to_parent_id: "   " });
+send(13, "import_json", { file_path: importFile, into_parent_id: "   " });
 
 await new Promise((r) => setTimeout(r, 2500));
 try { child.kill("SIGTERM"); } catch { /* gone */ }
@@ -112,6 +116,12 @@ check("move_bookmark — to_parent_id \"\" throws empty parent id (not provide-t
   emptyId(9), textOf(responses.get(9)).slice(0, 160));
 check("import_json — into_parent_id \"\" throws empty parent id (not Other bookmarks)",
   emptyId(10), textOf(responses.get(10)).slice(0, 160));
+check("add_bookmark — parent_id whitespace throws empty parent id (trim regression)",
+  emptyId(11), textOf(responses.get(11)).slice(0, 160));
+check("move_bookmark — to_parent_id whitespace throws empty parent id (trim regression)",
+  emptyId(12), textOf(responses.get(12)).slice(0, 160));
+check("import_json — into_parent_id whitespace throws empty parent id (trim regression)",
+  emptyId(13), textOf(responses.get(13)).slice(0, 160));
 
 console.log(exitCode ? "RESOLVE-FOLDER TEST FAILED" : "RESOLVE-FOLDER TEST PASSED");
 process.exit(exitCode);

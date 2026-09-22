@@ -24933,7 +24933,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.14" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.15" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -25015,7 +25015,10 @@ server.tool(
   "list_bookmarks",
   "List bookmarks as a flat array of {id, title, url, folder}. Optionally scope to a folder path (e.g. 'Bookmarks bar/Dev') to avoid returning the whole tree; omit to list everything.",
   { folder_path: external_exports.string().optional().describe("only list bookmarks within this folder path and its subfolders") },
-  async ({ folder_path }) => ok(await bridge.call("list_bookmarks", { folderPath: folder_path }))
+  async ({ folder_path }) => {
+    if (folder_path != null && !splitPath(folder_path).length) throw new Error("empty path");
+    return ok(await bridge.call("list_bookmarks", { folderPath: folder_path }));
+  }
 );
 server.tool(
   "list_folders",
@@ -25039,7 +25042,11 @@ server.tool(
   "ensure_folder_path",
   "Ensure a nested folder path exists (e.g. 'Bookmarks bar/Work/Reports'), creating missing levels. Returns the leaf folder. Top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { path: external_exports.string().describe("slash-separated folder path") },
-  async ({ path }) => ok(await bridge.call("ensure_path", { path: splitPath(path) }))
+  async ({ path }) => {
+    const segments = splitPath(path);
+    if (!segments.length) throw new Error("empty path");
+    return ok(await bridge.call("ensure_path", { path: segments }));
+  }
 );
 server.tool(
   "add_bookmark",

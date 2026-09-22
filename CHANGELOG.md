@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.14]
+
+### Fixed
+- `import_json` now rejects a provided empty or whitespace-only `file_path`
+  (`""`) with `empty file path`, matching `apply_moves` and `export_json`.
+  A blank path no longer falls through to `readFile` and a confusing ENOENT.
+
 ## [1.1.13]
 
 ### Fixed

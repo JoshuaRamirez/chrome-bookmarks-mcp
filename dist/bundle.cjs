@@ -24933,7 +24933,7 @@ var EXTENSION_DIR = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.13" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.14" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -25144,6 +25144,7 @@ server.tool(
   "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id. An into_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { file_path: external_exports.string(), into_path: external_exports.string().optional(), into_parent_id: external_exports.string().optional() },
   async ({ file_path, into_path, into_parent_id }) => {
+    rejectEmptyFilePath(file_path);
     let data;
     try {
       data = JSON.parse(await (0, import_promises.readFile)(file_path, "utf8"));

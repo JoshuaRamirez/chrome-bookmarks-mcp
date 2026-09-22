@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.13]
+
+### Fixed
+- `apply_moves` and `export_json` now reject a provided empty or whitespace-only
+  `file_path` (`""`) with `empty file path`. Omitting `file_path` still reads
+  the apply_moves default plan (`BOOKMARK_PLAN_FILE`, or
+  `~/.chrome-bookmarks-mcp/proposed-moves.tsv`) and still returns export JSON
+  in-band.
+
 ## [1.1.12]
 
 ### Fixed

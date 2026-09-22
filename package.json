@@ -1,6 +1,6 @@
 {
   "name": "chrome-bookmarks-mcp",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "private": false,
   "type": "module",
   "description": "MCP server that manages Chrome's synced bookmarks through a localhost bridge to a companion Chrome extension. Every edit goes through chrome.bookmarks, so changes sync durably.",

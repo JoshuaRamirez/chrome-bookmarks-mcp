@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.12]
+
+### Fixed
+- Write-path tools that go through `resolveFolder` (`add_bookmark`,
+  `create_folder`, `move_bookmark`, `import_json`) now reject a provided empty
+  or whitespace-only folder id (`parent_id` / `to_parent_id` / `into_parent_id`
+  `""`) with `empty parent id`. Omitting the id still uses the tool default
+  (`Bookmarks bar`, or `Other bookmarks` for import). `move_bookmark` with an
+  empty `to_parent_id` no longer falls through to the omit-both message;
+  omitting both destination arguments still asks for `to_path` or
+  `to_parent_id`.
+
 ## [1.1.11]
 
 ### Fixed

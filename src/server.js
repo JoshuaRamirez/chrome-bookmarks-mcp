@@ -43,7 +43,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.14" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.15" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -153,7 +153,12 @@ server.tool("bookmarks_status",
 server.tool("list_bookmarks",
   "List bookmarks as a flat array of {id, title, url, folder}. Optionally scope to a folder path (e.g. 'Bookmarks bar/Dev') to avoid returning the whole tree; omit to list everything.",
   { folder_path: z.string().optional().describe("only list bookmarks within this folder path and its subfolders") },
-  async ({ folder_path }) => ok(await bridge.call("list_bookmarks", { folderPath: folder_path })));
+  async ({ folder_path }) => {
+    // A provided path (including "" / whitespace / "/") is never treated as
+    // omit — throw before the bridge, matching listBookmarks / resolveFolder.
+    if (folder_path != null && !splitPath(folder_path).length) throw new Error("empty path");
+    return ok(await bridge.call("list_bookmarks", { folderPath: folder_path }));
+  });
 
 server.tool("list_folders",
   "List every folder with its id, title, depth, and full path — useful before adding/moving.",
@@ -173,7 +178,11 @@ server.tool("stats",
 server.tool("ensure_folder_path",
   "Ensure a nested folder path exists (e.g. 'Bookmarks bar/Work/Reports'), creating missing levels. Returns the leaf folder. Top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { path: z.string().describe("slash-separated folder path") },
-  async ({ path }) => ok(await bridge.call("ensure_path", { path: splitPath(path) })));
+  async ({ path }) => {
+    const segments = splitPath(path);
+    if (!segments.length) throw new Error("empty path");
+    return ok(await bridge.call("ensure_path", { path: segments }));
+  });
 
 server.tool("add_bookmark",
   "Add a bookmark. Target a folder by folder_path (created if missing, default 'Bookmarks bar') or by parent_id. A folder_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",

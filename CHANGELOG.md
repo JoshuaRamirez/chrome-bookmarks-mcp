@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.15]
+
+### Fixed
+- `ensure_folder_path` and `list_bookmarks` now reject a provided empty or
+  whitespace-only folder path (`""`, `/`) with `empty path` before any bridge
+  call, matching `resolveFolder`, `ensurePath`, and `listBookmarks`. A
+  disconnected bridge no longer turns that input into a not-connected error.
+  Omitting `folder_path` on `list_bookmarks` still lists everything.
+
 ## [1.1.14]
 
 ### Fixed

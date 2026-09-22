@@ -43,7 +43,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.12" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.13" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -98,6 +98,13 @@ async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
   if (!segments.length) throw new Error("empty path");
   const folder = await bridge.call("ensure_path", { path: segments });
   return folder.id;
+}
+
+// A provided file_path (including "" or whitespace-only) is never treated as
+// omit — throw "empty file path". Only null/undefined means the path was
+// omitted (apply_moves uses PLAN_DEFAULT; export_json returns JSON in-band).
+function rejectEmptyFilePath(file_path) {
+  if (file_path != null && !String(file_path).trim()) throw new Error("empty file path");
 }
 
 server.tool("bookmarks_status",
@@ -238,8 +245,9 @@ server.tool("export_json",
   "Export the whole bookmark tree as portable JSON. If file_path is given, write it server-side and return the path; otherwise return the JSON.",
   { file_path: z.string().optional() },
   async ({ file_path }) => {
+    rejectEmptyFilePath(file_path);
     const data = await bridge.call("export", {});
-    if (file_path) {
+    if (file_path != null) {
       try { await writeFile(file_path, JSON.stringify(data, null, 2)); }
       catch (e) { throw new Error(`Could not write export to ${file_path}: ${e.message}`); }
       return ok({ written: file_path });
@@ -267,7 +275,8 @@ server.tool("apply_moves",
   "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'. Each proposed folder path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks' (except the literal 'DELETE?' when delete_junk is used).",
   { file_path: z.string().optional(), dry_run: z.boolean().optional(), delete_junk: z.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
-    const path = file_path || PLAN_DEFAULT;
+    rejectEmptyFilePath(file_path);
+    const path = file_path != null ? file_path : PLAN_DEFAULT;
     let raw;
     try {
       raw = await readFile(path, "utf8");

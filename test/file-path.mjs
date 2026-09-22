@@ -1,10 +1,12 @@
-// Contract test: apply_moves and export_json must reject a provided empty
-// file path ("") or whitespace-only ("   ") with "empty file path". They must
-// not treat those as omit — apply_moves would silently read PLAN_DEFAULT, and
-// export_json would silently return JSON in-band.
+// Contract test: apply_moves, export_json, and import_json must reject a
+// provided empty file path ("") or whitespace-only ("   ") with "empty file
+// path". They must not treat those as omit — apply_moves would silently read
+// PLAN_DEFAULT, export_json would silently return JSON in-band, and
+// import_json would fall through to readFile and a confusing ENOENT.
 // Omitting file_path still uses the default: apply_moves reads
 // BOOKMARK_PLAN_FILE (dry_run over the sample plan, no Chrome), and
 // export_json attempts an in-band export (bridge not connected here).
+// import_json requires file_path, so there is no omit case.
 // No Chrome required — empty file path throws before any read or bridge call.
 //
 // Run: node test/file-path.mjs   (invoked by `npm test`)
@@ -62,6 +64,8 @@ send(4, "apply_moves", { dry_run: true });
 send(5, "export_json", { file_path: "" });
 send(6, "export_json", { file_path: "   " });
 send(7, "export_json", {});
+send(8, "import_json", { file_path: "" });
+send(9, "import_json", { file_path: "   " });
 
 await new Promise((r) => setTimeout(r, 2500));
 try { child.kill("SIGTERM"); } catch { /* gone */ }
@@ -78,7 +82,7 @@ function check(name, cond, detail) {
 const emptyFile = (id) => {
   const text = textOf(responses.get(id));
   return /empty file path/.test(text) &&
-    !/No plan file found|not connected|written/.test(text);
+    !/No plan file found|No file found|not connected|written/.test(text);
 };
 
 check("apply_moves — file_path \"\" throws empty file path (not default plan)",
@@ -101,6 +105,11 @@ check("export_json — omitted file_path still returns in-band (bridge, not empt
   /not connected/.test(textOf(responses.get(7))) &&
     !/empty file path/.test(textOf(responses.get(7))),
   textOf(responses.get(7)).slice(0, 200));
+
+check("import_json — file_path \"\" throws empty file path (not ENOENT)",
+  emptyFile(8), textOf(responses.get(8)).slice(0, 200));
+check("import_json — file_path whitespace throws empty file path (trim regression)",
+  emptyFile(9), textOf(responses.get(9)).slice(0, 200));
 
 console.log(exitCode ? "FILE-PATH TEST FAILED" : "FILE-PATH TEST PASSED");
 process.exit(exitCode);

@@ -43,7 +43,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.13" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.14" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -103,6 +103,7 @@ async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
 // A provided file_path (including "" or whitespace-only) is never treated as
 // omit — throw "empty file path". Only null/undefined means the path was
 // omitted (apply_moves uses PLAN_DEFAULT; export_json returns JSON in-band).
+// import_json requires file_path, so "" / whitespace still throws before readFile.
 function rejectEmptyFilePath(file_path) {
   if (file_path != null && !String(file_path).trim()) throw new Error("empty file path");
 }
@@ -259,6 +260,7 @@ server.tool("import_json",
   "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id. An into_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { file_path: z.string(), into_path: z.string().optional(), into_parent_id: z.string().optional() },
   async ({ file_path, into_path, into_parent_id }) => {
+    rejectEmptyFilePath(file_path);
     let data;
     try {
       data = JSON.parse(await readFile(file_path, "utf8"));

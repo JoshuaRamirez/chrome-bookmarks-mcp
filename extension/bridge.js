@@ -53,34 +53,16 @@ async function bridgeDispatch(method, p) {
   }
 }
 
-// Allowlist of first-segment aliases for Chrome's three permanent roots.
-// Exact match after lowercasing and collapsing whitespace — keep in lockstep
-// with permanentRootAlias in src/server.js. Substring tests falsely accept
-// Sidebar / Mother / Automobile (they contain bar / other / mobile).
-const PERMANENT_ROOT_ALIASES = new Map([
-  ["bar", ["bookmarks-bar", "1"]],
-  ["toolbar", ["bookmarks-bar", "1"]],
-  ["bookmarks bar", ["bookmarks-bar", "1"]],
-  ["bookmarks-bar", ["bookmarks-bar", "1"]],
-  ["other", ["other", "2"]],
-  ["other bookmarks", ["other", "2"]],
-  ["mobile", ["mobile", "3"]],
-  ["mobile bookmarks", ["mobile", "3"]],
-]);
-
-function permanentRootAlias(segment) {
-  const key = String(segment || "").toLowerCase().replace(/\s+/g, " ").trim();
-  return PERMANENT_ROOT_ALIASES.get(key) || null;
-}
-
 // Resolve (creating missing levels) a folder path. First segment must name a
 // permanent root: Bookmarks bar / Other bookmarks / Mobile bookmarks.
+// Alias allowlist is BookmarkStore.permanentRootAlias (lib/bookmarks.js),
+// kept in lockstep with src/server.js.
 async function ensurePath(segments) {
   if (!segments.length) throw new Error("empty path");
   const [root] = await chrome.bookmarks.getTree();
   const roots = root.children || [];
   const first = segments[0].toLowerCase();
-  const alias = permanentRootAlias(segments[0]);
+  const alias = BookmarkStore.permanentRootAlias(segments[0]);
   let cur = alias
     ? (roots.find(r => r.folderType === alias[0]) || roots.find(r => r.id === alias[1]))
     : roots.find(r => (r.title || "").toLowerCase() === first);

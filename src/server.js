@@ -43,7 +43,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.15" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.16" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -52,8 +52,9 @@ const ok = (data) => ({
 
 // Allowlist of first-segment aliases for Chrome's three permanent roots.
 // Exact match after lowercasing and collapsing whitespace — keep in lockstep
-// with permanentRootAlias in extension/bridge.js. Substring tests falsely
-// accept Sidebar / Mother / Automobile (they contain bar / other / mobile).
+// with BookmarkStore.permanentRootAlias in extension/lib/bookmarks.js
+// (ensurePath and listBookmarks). Substring tests falsely accept Sidebar /
+// Mother / Automobile (they contain bar / other / mobile).
 const PERMANENT_ROOT_ALIASES = new Map([
   ["bar", ["bookmarks-bar", "1"]],
   ["toolbar", ["bookmarks-bar", "1"]],

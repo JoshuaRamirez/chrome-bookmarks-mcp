@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.16]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` expands a permanent-root short alias
+  on the first `folder_path` segment (`bar`, `toolbar`, `bookmarks-bar`,
+  `other`, `mobile`, and the full titles) to the live root from `getTree()`
+  (`folderType`, else id — the same lookup `ensurePath` uses). `bar/Dev`
+  scopes that root even when Chrome localizes the title (for example
+  `Lesezeichenleiste` instead of `Bookmarks bar`). Later segments stay
+  literal titles. Substring lookalikes (`Sidebar`, `Mother`, `Automobile`)
+  stay unmatched. Omitting `folder_path` still lists everything.
+
 ## [1.1.15]
 
 ### Fixed

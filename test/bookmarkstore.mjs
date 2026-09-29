@@ -36,7 +36,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 //     "Dupe GH"     https://github.com                (201)  <- dup of 102
 const TREE = {
   id: "0", title: "", children: [
-    { id: "1", title: "Bookmarks bar", parentId: "0", children: [
+    { id: "1", title: "Bookmarks bar", folderType: "bookmarks-bar", parentId: "0", children: [
       { id: "10", title: "Dev", parentId: "1", children: [
         { id: "100", title: "MCP Spec", url: "https://modelcontextprotocol.io", parentId: "10" },
         { id: "101", title: "React", url: "https://react.dev", parentId: "10" },
@@ -57,7 +57,7 @@ const TREE = {
         { id: "500", title: "Slash", url: "https://backslash.example", parentId: "50" },
       ] },
     ] },
-    { id: "2", title: "Other bookmarks", parentId: "0", children: [
+    { id: "2", title: "Other bookmarks", folderType: "other", parentId: "0", children: [
       { id: "20", title: "News", parentId: "2", children: [
         { id: "200", title: "HN", url: "https://news.ycombinator.com", parentId: "20" },
       ] },
@@ -191,6 +191,38 @@ for (const aliasPath of ["bar/Dev", "toolbar/Dev", "bookmarks-bar/Dev"]) {
     idsOf(hits) === idsOf(fullDev) &&
     hits.every((b) => b.folder === "Bookmarks bar / Dev"),
     JSON.stringify(hits));
+}
+
+// Localized Chrome profile: the bookmarks-bar node is not titled with the
+// English display string. The alias must resolve to that live node
+// (folderType, else permanent id), and later segments stay literal titles.
+const barNode = TREE.children.find((n) => n.id === "1");
+const savedBarTitle = barNode.title;
+const savedBarType = barNode.folderType;
+barNode.title = "Lesezeichenleiste";
+try {
+  const localizedAlias = await BookmarkStore.listBookmarks("bar/Dev");
+  const localizedLiteral = await BookmarkStore.listBookmarks("Lesezeichenleiste/Dev");
+  check("listBookmarks bar/Dev scopes a localized bookmarks-bar title",
+    localizedAlias.length === 2 &&
+    localizedAlias.every((b) => b.folder === "Lesezeichenleiste / Dev") &&
+    idsOf(localizedAlias) === idsOf(localizedLiteral) &&
+    localizedAlias.some((b) => b.id === "100") &&
+    localizedAlias.some((b) => b.id === "101") &&
+    localizedAlias.every((b) => b.id !== "102" && b.id !== "200"),
+    JSON.stringify(localizedAlias));
+
+  delete barNode.folderType;
+  const viaId = await BookmarkStore.listBookmarks("toolbar/Dev");
+  check("listBookmarks toolbar/Dev scopes the same localized root via permanent id",
+    viaId.length === localizedAlias.length &&
+    idsOf(viaId) === idsOf(localizedAlias) &&
+    viaId.every((b) => b.folder === "Lesezeichenleiste / Dev"),
+    JSON.stringify(viaId));
+} finally {
+  barNode.title = savedBarTitle;
+  if (savedBarType === undefined) delete barNode.folderType;
+  else barNode.folderType = savedBarType;
 }
 
 const fullNews = await BookmarkStore.listBookmarks("Other bookmarks/News");

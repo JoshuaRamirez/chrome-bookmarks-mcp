@@ -57,18 +57,19 @@ const PERMANENT_ROOT_ALIASES = new Map([
   ["mobile bookmarks", ["mobile", "3"]],
 ]);
 
-// Canonical Chrome titles keyed by folderType (the first element of each
-// alias value). Not a second alias allowlist — new alias keys that point at
-// these folderTypes expand without another table.
-const PERMANENT_ROOT_TITLES = {
-  "bookmarks-bar": "Bookmarks bar",
-  "other": "Other bookmarks",
-  "mobile": "Mobile bookmarks",
-};
-
-function permanentRootTitle(segment) {
+// First-segment alias → the live permanent root's title. Chrome localizes
+// those titles (German "Lesezeichenleiste", and so on), so an English display
+// string is not a valid rewrite. Lookup matches ensurePath: folderType, else
+// the conventional permanent id.
+async function resolvePermanentRootTitle(segment) {
   const alias = BookmarkStore.permanentRootAlias(segment);
-  return alias ? (PERMANENT_ROOT_TITLES[alias[0]] || null) : null;
+  if (!alias) return null;
+  const [root] = await chrome.bookmarks.getTree();
+  const roots = root.children || [];
+  const node = roots.find((r) => r.folderType === alias[0])
+    || roots.find((r) => r.id === alias[1]);
+  const title = node && String(node.title || "").trim();
+  return title || null;
 }
 
 class BookmarkStore {
@@ -161,9 +162,11 @@ class BookmarkStore {
   // unescapes; no join→re-split) so "bookmarks bar/dev" and USAGE
   // "Other Bookmarks" match Chrome titles, and a title like "CI/CD" is one
   // segment. Emitted `folder` keeps Chrome's casing with / and \ escaped so
-  // the string round-trips through splitPath. The first segment is expanded
-  // through PERMANENT_ROOT_ALIASES (same allowlist as ensurePath) so
-  // "bar/Dev" scopes Bookmarks bar / Dev. Later segments stay raw titles.
+  // the string round-trips through splitPath. The first segment, when it is a
+  // permanent-root alias, is replaced with that root's actual title from
+  // getTree() (folderType, else id — same as ensurePath) so "bar/Dev" scopes
+  // the bookmarks bar even when Chrome has localized the title. Later
+  // segments stay literal titles.
   // A provided folderPath that normalizes to empty ("/", "///", whitespace)
   // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
   // / null) still lists everything.
@@ -172,7 +175,7 @@ class BookmarkStore {
     if (folderPath != null) {
       const segs = splitPath(folderPath);
       if (!segs.length) throw new Error("empty path");
-      const rootTitle = permanentRootTitle(segs[0]);
+      const rootTitle = await resolvePermanentRootTitle(segs[0]);
       if (rootTitle) segs[0] = rootTitle;
       prefixSegs = segs.map((s) => s.toLowerCase());
     }

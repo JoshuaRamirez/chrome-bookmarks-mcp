@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.16]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` now expands a permanent-root short alias
+  on the first `folder_path` segment (`bar`, `toolbar`, `bookmarks-bar`,
+  `other`, `mobile`, and the full titles) through the same exact allowlist
+  `ensurePath` uses, so `bar/Dev` scopes Bookmarks bar / Dev instead of
+  returning an empty list. Substring lookalikes (`Sidebar`, `Mother`,
+  `Automobile`) stay unmatched. Omitting `folder_path` still lists everything.
+
 ## [1.1.15]
 
 ### Fixed

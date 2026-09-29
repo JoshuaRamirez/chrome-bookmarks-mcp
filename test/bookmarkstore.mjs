@@ -182,6 +182,35 @@ check("listBookmarks matches USAGE Other Bookmarks casing and keeps Chrome folde
   otherTitleCase.some((b) => b.id === "201" && b.folder === "Other bookmarks"),
   JSON.stringify(otherTitleCase));
 
+const idsOf = (rows) => rows.map((b) => b.id).sort().join(",");
+const fullDev = await BookmarkStore.listBookmarks("Bookmarks bar/Dev");
+for (const aliasPath of ["bar/Dev", "toolbar/Dev", "bookmarks-bar/Dev"]) {
+  const hits = await BookmarkStore.listBookmarks(aliasPath);
+  check(`listBookmarks ${aliasPath} scopes the same bookmarks as Bookmarks bar/Dev`,
+    hits.length === fullDev.length &&
+    idsOf(hits) === idsOf(fullDev) &&
+    hits.every((b) => b.folder === "Bookmarks bar / Dev"),
+    JSON.stringify(hits));
+}
+
+const fullNews = await BookmarkStore.listBookmarks("Other bookmarks/News");
+const otherAlias = await BookmarkStore.listBookmarks("other/News");
+check("listBookmarks other/News scopes the same bookmarks as Other bookmarks/News",
+  otherAlias.length === fullNews.length &&
+  otherAlias.length === 1 &&
+  otherAlias[0].id === "200" &&
+  otherAlias[0].folder === "Other bookmarks / News",
+  JSON.stringify(otherAlias));
+
+// Exact Map keys only — Sidebar / Mother / Automobile contain bar / other /
+// mobile and must not expand (#47).
+for (const raw of ["Sidebar/Dev", "Mother/Kids", "Automobile/Cars"]) {
+  const hits = await BookmarkStore.listBookmarks(raw);
+  check(`listBookmarks does not expand substring alias ${raw}`,
+    hits.length === 0,
+    JSON.stringify(hits));
+}
+
 // A provided folderPath that normalizes to empty must throw — not list-all.
 // Sibling write tools (ensurePath / apply_moves) use the same "empty path"
 // message. Omit (listBookmarks() above) still lists everything.

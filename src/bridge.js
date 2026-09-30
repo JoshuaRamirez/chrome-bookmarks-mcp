@@ -14,6 +14,7 @@ export class Bridge {
     this.pending = new Map(); // id -> {resolve, reject, timer}
     this.listening = false;  // did the WebSocket server bind the port?
     this.bindError = null;    // { code, message } if binding failed (e.g. EADDRINUSE)
+    this.extensionVersion = ""; // plugin/package version from the active hello; "" if none
   }
 
   start() {
@@ -25,9 +26,16 @@ export class Bridge {
     });
     this.wss.on("connection", (ws) => {
       this.sock = ws;
+      this.extensionVersion = "";
       this.log("[bridge] extension connected");
-      ws.on("message", (buf) => this._onMessage(buf));
-      ws.on("close", () => { if (this.sock === ws) this.sock = null; this.log("[bridge] extension disconnected"); });
+      ws.on("message", (buf) => this._onMessage(ws, buf));
+      ws.on("close", () => {
+        if (this.sock === ws) {
+          this.sock = null;
+          this.extensionVersion = "";
+        }
+        this.log("[bridge] extension disconnected");
+      });
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
     });
     this.wss.on("error", (e) => {
@@ -51,13 +59,21 @@ export class Bridge {
       listening: this.listening,
       port: this.port,
       bindError: this.bindError,
+      extensionVersion: this.extensionVersion,
     };
   }
 
-  _onMessage(buf) {
+  _onMessage(ws, buf) {
+    if (this.sock !== ws) return;
     let msg;
     try { msg = JSON.parse(buf.toString()); } catch { return; }
-    if (msg.hello) { this.log(`[bridge] hello from ${msg.hello}`); return; }
+    if (msg.hello) {
+      // Sibling `version` is the plugin/package version this extension shipped
+      // with (package.json). Older builds send hello with no version.
+      this.extensionVersion = typeof msg.version === "string" ? msg.version.trim() : "";
+      this.log(`[bridge] hello from ${msg.hello}${this.extensionVersion ? " " + this.extensionVersion : " (no version)"}`);
+      return;
+    }
     if (msg.id != null && this.pending.has(msg.id)) {
       const { resolve, reject, timer } = this.pending.get(msg.id);
       clearTimeout(timer);

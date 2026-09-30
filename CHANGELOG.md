@@ -3,6 +3,30 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.17]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` rejects a provided `folder_path` whose
+  first segment is neither a permanent-root alias nor a live root title from
+  `getTree()` (alias via `folderType`/id, otherwise a case-insensitive title
+  among `root.children` — the same lookup `ensurePath` uses) with
+  `top-level folder "…" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`.
+  `Work/Dev`, `Sidebar/Dev`, `Mother/Kids`, and `Automobile/Cars` no longer
+  return a silent empty list. Short aliases still expand to the live root,
+  and a localized title passed literally (for example `Lesezeichenleiste/Dev`)
+  still scopes. Omitting `folder_path` still lists everything. A valid root
+  whose child is missing or empty (`Bookmarks bar/NoSuch`) still returns `[]`.
+- Marketplace upgrades leave Chrome pointed at the previous unpacked
+  extension (`.../<old-version>/extension`), so a new `listBookmarks` never
+  loads. The extension hello now reports the plugin version this package
+  shipped with (`package.json`, currently 1.1.17 — not the separate Chrome
+  `manifest.json` version). When the bridge is connected, `bookmarks_status`
+  includes `server_version` and `extension_version`. If they differ, or an
+  older extension reports no version, the tool returns a warning and steps
+  to open `chrome://extensions`, remove/reload the old unpacked extension,
+  and Load unpacked from the current `extension_dir`, then re-run
+  `bookmarks_status`. See the README upgrade note.
+
 ## [1.1.16]
 
 ### Fixed

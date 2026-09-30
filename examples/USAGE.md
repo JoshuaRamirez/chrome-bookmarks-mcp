@@ -13,8 +13,18 @@ through `chrome.bookmarks`, so they sync across your signed-in Chrome instances.
 Claude calls `bookmarks_status`. Connected looks like:
 
 ```json
-{ "connected": true, "port": 8765, "message": "Extension bridge connected — all bookmark tools are ready." }
+{
+  "connected": true,
+  "port": 8765,
+  "server_version": "1.1.17",
+  "extension_version": "1.1.17",
+  "message": "Extension bridge connected — all bookmark tools are ready."
+}
 ```
+
+`extension_version` must match `server_version`. If it is missing or different,
+the response includes a `warning` and a `fix` list: Chrome is still on an older
+unpacked folder. Load the `extension_dir` it prints, then ask again.
 
 If it comes back `connected: false`, the response includes a `fix` list — follow
 those steps and ask again. That is usually open Chrome and load the extension

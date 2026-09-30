@@ -72,6 +72,23 @@ async function resolvePermanentRootTitle(segment) {
   return title || null;
 }
 
+// Live permanent root for a first path segment, using ensurePath's lookup:
+// alias via folderType/id, otherwise a case-insensitive title among
+// root.children. Null when nothing matches — including substring lookalikes
+// such as Sidebar / Mother / Automobile.
+async function findPermanentRoot(segment) {
+  const [root] = await chrome.bookmarks.getTree();
+  const roots = root.children || [];
+  const alias = BookmarkStore.permanentRootAlias(segment);
+  if (alias) {
+    return roots.find((r) => r.folderType === alias[0])
+      || roots.find((r) => r.id === alias[1])
+      || null;
+  }
+  const first = String(segment || "").toLowerCase();
+  return roots.find((r) => (r.title || "").toLowerCase() === first) || null;
+}
+
 class BookmarkStore {
   // Conventional permanent ids; treated as non-editable roots.
   static PERMANENT_PARENT = "0"; // children of the tree root are the permanent folders
@@ -166,7 +183,11 @@ class BookmarkStore {
   // permanent-root alias, is replaced with that root's actual title from
   // getTree() (folderType, else id — same as ensurePath) so "bar/Dev" scopes
   // the bookmarks bar even when Chrome has localized the title. Later
-  // segments stay literal titles.
+  // segments stay literal titles. A first segment that is neither an alias
+  // nor a live root title (same lookup as ensurePath) throws
+  // top-level folder "…" not found — not a silent empty list. A localized
+  // title passed literally still matches. A resolved root whose child is
+  // missing or empty still returns [].
   // A provided folderPath that normalizes to empty ("/", "///", whitespace)
   // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
   // / null) still lists everything.
@@ -176,7 +197,11 @@ class BookmarkStore {
       const segs = splitPath(folderPath);
       if (!segs.length) throw new Error("empty path");
       const rootTitle = await resolvePermanentRootTitle(segs[0]);
-      if (rootTitle) segs[0] = rootTitle;
+      if (rootTitle) {
+        segs[0] = rootTitle;
+      } else if (!(await findPermanentRoot(segs[0]))) {
+        throw new Error(`top-level folder "${segs[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
+      }
       prefixSegs = segs.map((s) => s.toLowerCase());
     }
     const out = [];

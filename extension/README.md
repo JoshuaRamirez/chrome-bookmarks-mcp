@@ -16,6 +16,11 @@ edits to the bookmark file, which the sync engine discards on launch.
 The full manager opens automatically on first load. Re-open it any time from the
 toolbar icon → **Open full manager →**.
 
+After a plugin version bump, that cache path changes. Chrome does not follow
+the old folder. Remove the previous unpacked extension and Load unpacked from
+the new `<version>/extension` directory (or the `extension_dir` from
+`bookmarks_status`).
+
 ## Two surfaces
 
 **Toolbar popup** — quick-add the current tab into any folder (with a clean name).

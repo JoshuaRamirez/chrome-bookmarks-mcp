@@ -203,14 +203,21 @@ barNode.title = "Lesezeichenleiste";
 try {
   const localizedAlias = await BookmarkStore.listBookmarks("bar/Dev");
   const localizedLiteral = await BookmarkStore.listBookmarks("Lesezeichenleiste/Dev");
+  const localizedLower = await BookmarkStore.listBookmarks("lesezeichenleiste/dev");
   check("listBookmarks bar/Dev scopes a localized bookmarks-bar title",
     localizedAlias.length === 2 &&
     localizedAlias.every((b) => b.folder === "Lesezeichenleiste / Dev") &&
     idsOf(localizedAlias) === idsOf(localizedLiteral) &&
+    idsOf(localizedLower) === idsOf(localizedAlias) &&
+    localizedLower.every((b) => b.folder === "Lesezeichenleiste / Dev") &&
     localizedAlias.some((b) => b.id === "100") &&
     localizedAlias.some((b) => b.id === "101") &&
     localizedAlias.every((b) => b.id !== "102" && b.id !== "200"),
-    JSON.stringify(localizedAlias));
+    JSON.stringify({ localizedAlias, localizedLower }));
+  const localizedMissing = await BookmarkStore.listBookmarks("Lesezeichenleiste/NoSuch");
+  check("listBookmarks localized root with a missing child returns []",
+    Array.isArray(localizedMissing) && localizedMissing.length === 0,
+    JSON.stringify(localizedMissing));
 
   delete barNode.folderType;
   const viaId = await BookmarkStore.listBookmarks("toolbar/Dev");
@@ -235,13 +242,35 @@ check("listBookmarks other/News scopes the same bookmarks as Other bookmarks/New
   JSON.stringify(otherAlias));
 
 // Exact Map keys only — Sidebar / Mother / Automobile contain bar / other /
-// mobile and must not expand (#47).
-for (const raw of ["Sidebar/Dev", "Mother/Kids", "Automobile/Cars"]) {
-  const hits = await BookmarkStore.listBookmarks(raw);
-  check(`listBookmarks does not expand substring alias ${raw}`,
-    hits.length === 0,
-    JSON.stringify(hits));
+// mobile and must not expand (#47). An unknown top-level folder is the same
+// error ensurePath throws, not a silent empty list (#103).
+for (const raw of ["Work/Dev", "Sidebar/Dev", "Mother/Kids", "Automobile/Cars"]) {
+  let threw = false;
+  let message = "";
+  let leaked = null;
+  try {
+    leaked = await BookmarkStore.listBookmarks(raw);
+  } catch (e) {
+    threw = true;
+    message = String(e?.message || e);
+  }
+  const segment = splitPath(raw)[0];
+  const expected = `top-level folder "${segment}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`;
+  check(
+    `listBookmarks rejects unknown top-level folder ${raw}`,
+    threw && message === expected,
+    threw ? message : `returned ${JSON.stringify(leaked)}`
+  );
 }
+
+const missingChild = await BookmarkStore.listBookmarks("Bookmarks bar/NoSuch");
+check("listBookmarks valid root with a missing child returns []",
+  Array.isArray(missingChild) && missingChild.length === 0,
+  JSON.stringify(missingChild));
+const missingAliasChild = await BookmarkStore.listBookmarks("bar/NoSuch");
+check("listBookmarks alias root with a missing child returns []",
+  Array.isArray(missingAliasChild) && missingAliasChild.length === 0,
+  JSON.stringify(missingAliasChild));
 
 // A provided folderPath that normalizes to empty must throw — not list-all.
 // Sibling write tools (ensurePath / apply_moves) use the same "empty path"

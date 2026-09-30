@@ -3,6 +3,10 @@
 // BookmarkStore (lib/bookmarks.js, imported first by background.js).
 
 const BRIDGE_URL = "ws://127.0.0.1:8765";
+// Plugin/package version this extension was shipped with. Must match
+// package.json "version" (and .claude-plugin/plugin.json). Chrome's
+// manifest.json "version" is a separate extension version and is not this.
+const PLUGIN_VERSION = "1.1.17";
 let _ws = null;
 
 function bridgeConnected() {
@@ -15,7 +19,10 @@ function bridgeConnect() {
   console.log("[bridge] connecting to", BRIDGE_URL);
   try { ws = new WebSocket(BRIDGE_URL); } catch (e) { console.log("[bridge] construct failed:", e && e.message); return; }
   _ws = ws;
-  ws.onopen = () => { console.log("[bridge] OPEN"); try { ws.send(JSON.stringify({ hello: "bookmark-manager" })); } catch (_) {} };
+  ws.onopen = () => {
+    console.log("[bridge] OPEN");
+    try { ws.send(JSON.stringify({ hello: "bookmark-manager", version: PLUGIN_VERSION })); } catch (_) {}
+  };
   ws.onmessage = async (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch (_) { return; }

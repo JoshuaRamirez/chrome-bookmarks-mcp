@@ -60,10 +60,12 @@ existing UI builds nodes explicitly.
 
 SemVer. A user-facing change bumps the patch/minor in **five** places, kept in
 lockstep:
-- `package.json`
+- `package.json` (the server reads this at runtime for its MCP version and
+  `bookmarks_status` `server_version`)
 - `package-lock.json` (root `version` and `packages[""].version`)
 - `.claude-plugin/plugin.json`
-- the `McpServer({ version })` string in `src/server.js`
+- `PLUGIN_VERSION` in `extension/bridge.js` (reported on the bridge hello;
+  Chrome's `manifest.json` `version` stays separate)
 - `CHANGELOG.md` (new `[x.y.z]` section)
 
 Docs-only changes do not bump the version. Publishing to the RedJay marketplace

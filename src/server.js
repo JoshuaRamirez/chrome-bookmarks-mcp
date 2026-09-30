@@ -43,7 +43,7 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.16" });
+const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.17" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({

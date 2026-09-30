@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.17]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` rejects a provided `folder_path` whose
+  first segment is neither a permanent-root alias nor a live root title from
+  `getTree()` (alias via `folderType`/id, otherwise a case-insensitive title
+  among `root.children` — the same lookup `ensurePath` uses) with
+  `top-level folder "…" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`.
+  `Work/Dev`, `Sidebar/Dev`, `Mother/Kids`, and `Automobile/Cars` no longer
+  return a silent empty list. Short aliases still expand to the live root,
+  and a localized title passed literally (for example `Lesezeichenleiste/Dev`)
+  still scopes. Omitting `folder_path` still lists everything. A valid root
+  whose child is missing or empty (`Bookmarks bar/NoSuch`) still returns `[]`.
+
 ## [1.1.16]
 
 ### Fixed

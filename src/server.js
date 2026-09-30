@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { writeFile, readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,11 +39,29 @@ const EXTENSION_DIR = (() => {
   return resolve(here, "../extension"); // best-effort default if not found
 })();
 
+// Plugin/package version from package.json — the same string the extension
+// reports on hello (PLUGIN_VERSION in extension/bridge.js). Not the Chrome
+// manifest version. One source of truth: do not hardcode a second copy here.
+const SERVER_VERSION = (() => {
+  const here = typeof __dirname !== "undefined"
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url));
+  for (const rel of ["../package.json", "./package.json"]) {
+    const p = resolve(here, rel);
+    if (!existsSync(p)) continue;
+    try {
+      const version = JSON.parse(readFileSync(p, "utf8")).version;
+      if (typeof version === "string" && version.trim()) return version.trim();
+    } catch { /* try the next candidate */ }
+  }
+  return "";
+})();
+
 const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
-const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.17" });
+const server = new McpServer({ name: "chrome-bookmarks", version: SERVER_VERSION || "0.0.0" });
 
 // Wrap a value as MCP text content.
 const ok = (data) => ({
@@ -110,12 +128,36 @@ function rejectEmptyFilePath(file_path) {
 }
 
 server.tool("bookmarks_status",
-  "Report whether the Chrome extension bridge is connected and on what port. When disconnected, returns step-by-step setup guidance — call this first if any other tool fails to reach the browser.",
+  "Report whether the Chrome extension bridge is connected and on what port. When connected, includes server_version and extension_version; a mismatch (or an extension that reports no version) means Chrome is still running an older unpacked copy and returns reload steps. When disconnected, returns step-by-step setup guidance — call this first if any other tool fails to reach the browser.",
   {},
   async () => {
     const s = bridge.status();
     if (s.connected) {
-      return ok({ connected: true, port: s.port, message: "Extension bridge connected — all bookmark tools are ready." });
+      const server_version = SERVER_VERSION;
+      const extension_version = s.extensionVersion || null;
+      const mismatch = extension_version !== server_version;
+      const body = {
+        connected: true,
+        port: s.port,
+        server_version,
+        extension_version,
+        message: mismatch
+          ? `Extension bridge connected, but the loaded extension does not match this server (${server_version || "unknown"}). Chrome is still running an older unpacked copy, so bookmark tools may keep the old behavior (including silent empty list_bookmarks results).`
+          : "Extension bridge connected — all bookmark tools are ready.",
+      };
+      if (mismatch) {
+        body.warning = extension_version
+          ? `extension_version ${extension_version} does not match server_version ${server_version}. Reload the unpacked extension from the current folder.`
+          : "The connected extension did not report a plugin version. It is an older build and does not include this release's bookmark fixes.";
+        body.extension_dir = EXTENSION_DIR;
+        body.fix = [
+          "Open chrome://extensions.",
+          "Remove the old unpacked Bookmark Manager extension, or reload it only if it already points at the folder below. Chrome does not follow a previous versioned cache path after a marketplace upgrade.",
+          `Click 'Load unpacked' and select this exact folder: ${EXTENSION_DIR}`,
+          "Then re-run bookmarks_status and confirm extension_version matches server_version.",
+        ];
+      }
+      return ok(body);
     }
     // The port never bound — almost always another server instance holding it.
     if (s.bindError) {

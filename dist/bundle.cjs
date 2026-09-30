@@ -24806,6 +24806,7 @@ var Bridge = class {
     this.pending = /* @__PURE__ */ new Map();
     this.listening = false;
     this.bindError = null;
+    this.extensionVersion = "";
   }
   start() {
     this.wss = new import_websocket_server.default({ host: "127.0.0.1", port: this.port });
@@ -24816,10 +24817,14 @@ var Bridge = class {
     });
     this.wss.on("connection", (ws) => {
       this.sock = ws;
+      this.extensionVersion = "";
       this.log("[bridge] extension connected");
-      ws.on("message", (buf) => this._onMessage(buf));
+      ws.on("message", (buf) => this._onMessage(ws, buf));
       ws.on("close", () => {
-        if (this.sock === ws) this.sock = null;
+        if (this.sock === ws) {
+          this.sock = null;
+          this.extensionVersion = "";
+        }
         this.log("[bridge] extension disconnected");
       });
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
@@ -24843,10 +24848,12 @@ var Bridge = class {
       connected: this.connected(),
       listening: this.listening,
       port: this.port,
-      bindError: this.bindError
+      bindError: this.bindError,
+      extensionVersion: this.extensionVersion
     };
   }
-  _onMessage(buf) {
+  _onMessage(ws, buf) {
+    if (this.sock !== ws) return;
     let msg;
     try {
       msg = JSON.parse(buf.toString());
@@ -24854,7 +24861,8 @@ var Bridge = class {
       return;
     }
     if (msg.hello) {
-      this.log(`[bridge] hello from ${msg.hello}`);
+      this.extensionVersion = typeof msg.version === "string" ? msg.version.trim() : "";
+      this.log(`[bridge] hello from ${msg.hello}${this.extensionVersion ? " " + this.extensionVersion : " (no version)"}`);
       return;
     }
     if (msg.id != null && this.pending.has(msg.id)) {
@@ -24930,10 +24938,23 @@ var EXTENSION_DIR = (() => {
   }
   return (0, import_node_path.resolve)(here, "../extension");
 })();
+var SERVER_VERSION = (() => {
+  const here = typeof __dirname !== "undefined" ? __dirname : (0, import_node_path.dirname)((0, import_node_url.fileURLToPath)(import_meta.url));
+  for (const rel of ["../package.json", "./package.json"]) {
+    const p = (0, import_node_path.resolve)(here, rel);
+    if (!(0, import_node_fs.existsSync)(p)) continue;
+    try {
+      const version2 = JSON.parse((0, import_node_fs.readFileSync)(p, "utf8")).version;
+      if (typeof version2 === "string" && version2.trim()) return version2.trim();
+    } catch {
+    }
+  }
+  return "";
+})();
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.17" });
+var server = new McpServer({ name: "chrome-bookmarks", version: SERVER_VERSION || "0.0.0" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -24974,12 +24995,32 @@ function rejectEmptyFilePath(file_path) {
 }
 server.tool(
   "bookmarks_status",
-  "Report whether the Chrome extension bridge is connected and on what port. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
+  "Report whether the Chrome extension bridge is connected and on what port. When connected, includes server_version and extension_version; a mismatch (or an extension that reports no version) means Chrome is still running an older unpacked copy and returns reload steps. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
   {},
   async () => {
     const s = bridge.status();
     if (s.connected) {
-      return ok({ connected: true, port: s.port, message: "Extension bridge connected \u2014 all bookmark tools are ready." });
+      const server_version = SERVER_VERSION;
+      const extension_version = s.extensionVersion || null;
+      const mismatch = extension_version !== server_version;
+      const body = {
+        connected: true,
+        port: s.port,
+        server_version,
+        extension_version,
+        message: mismatch ? `Extension bridge connected, but the loaded extension does not match this server (${server_version || "unknown"}). Chrome is still running an older unpacked copy, so bookmark tools may keep the old behavior (including silent empty list_bookmarks results).` : "Extension bridge connected \u2014 all bookmark tools are ready."
+      };
+      if (mismatch) {
+        body.warning = extension_version ? `extension_version ${extension_version} does not match server_version ${server_version}. Reload the unpacked extension from the current folder.` : "The connected extension did not report a plugin version. It is an older build and does not include this release's bookmark fixes.";
+        body.extension_dir = EXTENSION_DIR;
+        body.fix = [
+          "Open chrome://extensions.",
+          "Remove the old unpacked Bookmark Manager extension, or reload it only if it already points at the folder below. Chrome does not follow a previous versioned cache path after a marketplace upgrade.",
+          `Click 'Load unpacked' and select this exact folder: ${EXTENSION_DIR}`,
+          "Then re-run bookmarks_status and confirm extension_version matches server_version."
+        ];
+      }
+      return ok(body);
     }
     if (s.bindError) {
       const inUse = s.bindError.code === "EADDRINUSE";

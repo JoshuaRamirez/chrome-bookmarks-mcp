@@ -11,6 +11,17 @@ All notable changes to this project are documented here. Format loosely follows
   `update_bookmark`, `move_bookmark`, `remove_bookmark` and `import_json` answer
   with what they would do and send nothing to Chrome. `bookmarks_status` reports
   `writes: on|off`. Test: `test/writes-off.mjs`.
+- One copy per machine through shared-mcp: the README's registration runs the
+  server once behind a shared-mcp gateway, so every session shares one bridge
+  instead of all but the first failing on 8765. Test: `test/shared-sessions.mjs`
+  (two sessions read at once, writes off, no copy left on the port after stop).
+
+### Changed
+- A copy that can't bind the bridge port keeps retrying
+  (`BOOKMARK_BRIDGE_RETRY_MS`, default 2000) and takes the port when the holder
+  exits; `test/port-conflict.mjs` covers the take-over.
+- The server exits when its stdin closes, so an orphaned copy never keeps the
+  port or the extension's socket.
 
 ### Fixed
 - The smoke and port-conflict tests take a port the OS says is free, instead of a

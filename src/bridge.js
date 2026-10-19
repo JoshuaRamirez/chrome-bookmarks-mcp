@@ -6,8 +6,9 @@
 import { WebSocketServer } from "ws";
 
 export class Bridge {
-  constructor(port = 8765, log = (...a) => console.error(...a)) {
+  constructor(port = 8765, log = (...a) => console.error(...a), retryMs = Number(process.env.BOOKMARK_BRIDGE_RETRY_MS || 2000)) {
     this.port = port;
+    this.retryMs = retryMs;
     this.log = log;
     this.sock = null;        // the single active extension socket
     this.seq = 1;
@@ -17,10 +18,20 @@ export class Bridge {
   }
 
   start() {
+    this._listen();
+    // Periodic ping keeps the extension's MV3 service worker alive (WebSocket
+    // traffic resets its idle-shutdown timer).
+    this._ka = setInterval(() => {
+      if (this.connected()) { try { this.sock.send(JSON.stringify({ method: "ping" })); } catch {} }
+    }, 20000);
+  }
+
+  _listen() {
     this.wss = new WebSocketServer({ host: "127.0.0.1", port: this.port });
     this.wss.on("listening", () => {
       this.listening = true;
       this.bindError = null;
+      this._retry = null;
       this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
     });
     this.wss.on("connection", (ws) => {
@@ -33,15 +44,18 @@ export class Bridge {
     this.wss.on("error", (e) => {
       // A bind failure (typically EADDRINUSE) means another process already holds
       // the port — most often a second copy of this server. Record it so
-      // bookmarks_status can explain the real cause instead of "not connected".
-      if (!this.listening) this.bindError = { code: e.code || "", message: e.message };
+      // bookmarks_status can explain the real cause instead of "not connected",
+      // and keep trying: under shared-mcp this is the one long-lived copy, and it
+      // takes the port as soon as the other holder exits.
+      if (!this.listening) {
+        this.bindError = { code: e.code || "", message: e.message };
+        if (!this._retry) this.log("[bridge] server error:", e.message, `— retrying every ${this.retryMs} ms`);
+        clearTimeout(this._retry);
+        this._retry = setTimeout(() => { try { this.wss.close(); } catch {} this._listen(); }, this.retryMs);
+        return;
+      }
       this.log("[bridge] server error:", e.message);
     });
-    // Periodic ping keeps the extension's MV3 service worker alive (WebSocket
-    // traffic resets its idle-shutdown timer).
-    this._ka = setInterval(() => {
-      if (this.connected()) { try { this.sock.send(JSON.stringify({ method: "ping" })); } catch {} }
-    }, 20000);
   }
 
   // Snapshot of the bridge's health for diagnostics.

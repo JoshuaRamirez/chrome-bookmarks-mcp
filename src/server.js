@@ -88,9 +88,10 @@ server.tool("bookmarks_status",
         port: s.port,
         writes: WRITES_OFF ? "off" : "on",
         message: inUse
-          ? `Could not bind port ${s.port} (EADDRINUSE) — another process is already using it, most likely a second copy of this server.`
+          ? `Could not bind port ${s.port} (EADDRINUSE) — another process is already using it, most likely a second copy of this server. Retrying; this copy takes the port when it comes free.`
           : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
         fix: [
+          `Run this server once per machine through shared-mcp (shared_mcp.py connect --name chrome-bookmarks -- node dist/bundle.cjs) so every session shares one copy, or`,
           `Stop the other process using port ${s.port} (e.g. another running chrome-bookmarks server), or`,
           "Set BOOKMARK_BRIDGE_PORT to a free port for this server, and set the matching BRIDGE_URL in extension/bridge.js.",
           "Then restart and re-run bookmarks_status."
@@ -320,4 +321,10 @@ server.tool("remove_empty_folders",
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp] chrome-bookmarks server ready (stdio)");
+  // When whoever started us goes away (a session, or shared-mcp's gateway), stdin
+  // closes. Exit then, so an orphaned copy never keeps the bridge port and the
+  // extension's socket away from the copy that replaces it.
+  const quit = () => { console.error("[mcp] stdin closed; exiting"); process.exit(0); };
+  process.stdin.on("end", quit);
+  process.stdin.on("close", quit);
 })();

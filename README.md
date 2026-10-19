@@ -48,6 +48,25 @@ From the RedJay marketplace:
 The server is pre-bundled (`dist/bundle.cjs`) — no `npm install` needed at
 plugin-load time.
 
+### Many sessions on one machine: run it once, through shared-mcp
+
+The bridge port (8765) can be held by one process only, and every Claude Code
+session starts its own copy of an MCP server. Register the server through
+[shared-mcp](https://github.com/JoshuaRamirez/shared-mcp) so one long-lived
+copy owns the port and the extension's socket, and each session is a thin
+client of it:
+
+```
+claude mcp add chrome-bookmarks -s user -e BOOKMARK_WRITES=off -- \
+  python3 ~/Developer/shared-mcp/shared_mcp.py connect --name chrome-bookmarks \
+  --env BOOKMARK_WRITES -- "$(command -v node)" /abs/path/to/dist/bundle.cjs
+```
+
+A copy that can't bind the port keeps retrying (every `BOOKMARK_BRIDGE_RETRY_MS`,
+default 2000) and takes it when the holder exits, and a copy exits when its
+stdin closes, so an orphaned copy never keeps the port. Test:
+`test/shared-sessions.mjs` (two sessions reading at once).
+
 ### 2. The Chrome extension (one time)
 
 The extension lives in this plugin's `extension/` directory. After install,

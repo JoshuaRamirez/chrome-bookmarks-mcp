@@ -24798,8 +24798,9 @@ var import_websocket_server = __toESM(require_websocket_server(), 1);
 
 // src/bridge.js
 var Bridge = class {
-  constructor(port = 8765, log = (...a) => console.error(...a)) {
+  constructor(port = 8765, log = (...a) => console.error(...a), retryMs = Number(process.env.BOOKMARK_BRIDGE_RETRY_MS || 2e3)) {
     this.port = port;
+    this.retryMs = retryMs;
     this.log = log;
     this.sock = null;
     this.seq = 1;
@@ -24808,10 +24809,22 @@ var Bridge = class {
     this.bindError = null;
   }
   start() {
+    this._listen();
+    this._ka = setInterval(() => {
+      if (this.connected()) {
+        try {
+          this.sock.send(JSON.stringify({ method: "ping" }));
+        } catch {
+        }
+      }
+    }, 2e4);
+  }
+  _listen() {
     this.wss = new import_websocket_server.default({ host: "127.0.0.1", port: this.port });
     this.wss.on("listening", () => {
       this.listening = true;
       this.bindError = null;
+      this._retry = null;
       this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
     });
     this.wss.on("connection", (ws) => {
@@ -24825,17 +24838,21 @@ var Bridge = class {
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
     });
     this.wss.on("error", (e) => {
-      if (!this.listening) this.bindError = { code: e.code || "", message: e.message };
+      if (!this.listening) {
+        this.bindError = { code: e.code || "", message: e.message };
+        if (!this._retry) this.log("[bridge] server error:", e.message, `\u2014 retrying every ${this.retryMs} ms`);
+        clearTimeout(this._retry);
+        this._retry = setTimeout(() => {
+          try {
+            this.wss.close();
+          } catch {
+          }
+          this._listen();
+        }, this.retryMs);
+        return;
+      }
       this.log("[bridge] server error:", e.message);
     });
-    this._ka = setInterval(() => {
-      if (this.connected()) {
-        try {
-          this.sock.send(JSON.stringify({ method: "ping" }));
-        } catch {
-        }
-      }
-    }, 2e4);
   }
   // Snapshot of the bridge's health for diagnostics.
   status() {
@@ -24941,8 +24958,9 @@ server.tool(
         listening: false,
         port: s.port,
         writes: WRITES_OFF ? "off" : "on",
-        message: inUse ? `Could not bind port ${s.port} (EADDRINUSE) \u2014 another process is already using it, most likely a second copy of this server.` : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
+        message: inUse ? `Could not bind port ${s.port} (EADDRINUSE) \u2014 another process is already using it, most likely a second copy of this server. Retrying; this copy takes the port when it comes free.` : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
         fix: [
+          `Run this server once per machine through shared-mcp (shared_mcp.py connect --name chrome-bookmarks -- node dist/bundle.cjs) so every session shares one copy, or`,
           `Stop the other process using port ${s.port} (e.g. another running chrome-bookmarks server), or`,
           "Set BOOKMARK_BRIDGE_PORT to a free port for this server, and set the matching BRIDGE_URL in extension/bridge.js.",
           "Then restart and re-run bookmarks_status."
@@ -25211,4 +25229,10 @@ server.tool(
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp] chrome-bookmarks server ready (stdio)");
+  const quit = () => {
+    console.error("[mcp] stdin closed; exiting");
+    process.exit(0);
+  };
+  process.stdin.on("end", quit);
+  process.stdin.on("close", quit);
 })();

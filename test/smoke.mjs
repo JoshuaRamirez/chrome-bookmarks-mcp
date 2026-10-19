@@ -10,10 +10,17 @@ import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { createServer } from "node:net";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE = join(__dirname, "..", "dist", "bundle.cjs");
-const PORT = "8791"; // off-default so we never collide with a real instance
+// A port the OS says is free right now, so the test never collides with a real
+// instance or any other local server (a fixed off-default port once did).
+const PORT = await new Promise((res, rej) => {
+  const probe = createServer();
+  probe.once("error", rej);
+  probe.listen(0, "127.0.0.1", () => { const { port } = probe.address(); probe.close(() => res(String(port))); });
+});
 
 const EXPECTED_TOOLS = [
   "bookmarks_status", "list_bookmarks", "list_folders", "search_bookmarks",

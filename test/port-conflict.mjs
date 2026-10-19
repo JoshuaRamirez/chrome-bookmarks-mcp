@@ -8,10 +8,16 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { createServer } from "node:net";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE = join(__dirname, "..", "dist", "bundle.cjs");
-const PORT = "8794"; // dedicated to this test
+// A port the OS says is free right now; the blocker below then takes it.
+const PORT = await new Promise((res, rej) => {
+  const probe = createServer();
+  probe.once("error", rej);
+  probe.listen(0, "127.0.0.1", () => { const { port } = probe.address(); probe.close(() => res(String(port))); });
+});
 
 function spawnServer() {
   return spawn("node", [BUNDLE], {

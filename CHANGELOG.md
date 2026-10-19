@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+- `BOOKMARK_WRITES=off` makes the server report-only: tools with `dry_run` always
+  preview, and `ensure_folder_path`, `add_bookmark`, `create_folder`,
+  `update_bookmark`, `move_bookmark`, `remove_bookmark` and `import_json` answer
+  with what they would do and send nothing to Chrome. `bookmarks_status` reports
+  `writes: on|off`. Test: `test/writes-off.mjs`.
+
+### Fixed
+- The smoke and port-conflict tests take a port the OS says is free, instead of a
+  fixed 8791 / 8794 that another local server could hold.
+
 ## [1.1.2]
 
 ### Changed

@@ -42,6 +42,20 @@ const PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 const bridge = new Bridge(PORT);
 bridge.start();
 
+// BOOKMARK_WRITES=off makes the server report-only: tools with dry_run always
+// preview, and tools that would add, move, rename or delete answer with what
+// they would do instead of doing it. Anything else (unset, "on") writes as before.
+const WRITES_OFF = /^off$/i.test(process.env.BOOKMARK_WRITES || "");
+const WRITE_OPS = new Set(["ensure_path", "create_bookmark", "create_folder", "rename", "set_url", "move", "remove", "import"]);
+const bridgeCall = bridge.call.bind(bridge);
+bridge.call = (op, params) => {
+  if (WRITES_OFF && WRITE_OPS.has(op)) {
+    return Promise.reject(new Error(`writes are off (BOOKMARK_WRITES=off): '${op}' was not sent to Chrome`));
+  }
+  return bridgeCall(op, params);
+};
+const reportOnly = (tool, args) => ok({ writes: "off", tool, would: args, note: "BOOKMARK_WRITES=off: nothing was changed in Chrome." });
+
 const server = new McpServer({ name: "chrome-bookmarks", version: "1.1.2" });
 
 // Wrap a value as MCP text content.
@@ -63,7 +77,7 @@ server.tool("bookmarks_status",
   async () => {
     const s = bridge.status();
     if (s.connected) {
-      return ok({ connected: true, port: s.port, message: "Extension bridge connected — all bookmark tools are ready." });
+      return ok({ connected: true, port: s.port, writes: WRITES_OFF ? "off" : "on", message: "Extension bridge connected — all bookmark tools are ready." });
     }
     // The port never bound — almost always another server instance holding it.
     if (s.bindError) {
@@ -72,6 +86,7 @@ server.tool("bookmarks_status",
         connected: false,
         listening: false,
         port: s.port,
+        writes: WRITES_OFF ? "off" : "on",
         message: inUse
           ? `Could not bind port ${s.port} (EADDRINUSE) — another process is already using it, most likely a second copy of this server.`
           : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
@@ -87,6 +102,7 @@ server.tool("bookmarks_status",
       connected: false,
       listening: s.listening,
       port: s.port,
+      writes: WRITES_OFF ? "off" : "on",
       extension_dir: EXTENSION_DIR,
       message: "Extension bridge NOT connected. The server is listening, but the companion Chrome extension hasn't connected yet.",
       fix: [
@@ -122,7 +138,7 @@ server.tool("stats",
 server.tool("ensure_folder_path",
   "Ensure a nested folder path exists (e.g. 'Bookmarks bar/Work/Reports'), creating missing levels. Returns the leaf folder. Top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { path: z.string().describe("slash-separated folder path") },
-  async ({ path }) => ok(await bridge.call("ensure_path", { path: splitPath(path) })));
+  async ({ path }) => WRITES_OFF ? reportOnly("ensure_folder_path", { path }) : ok(await bridge.call("ensure_path", { path: splitPath(path) })));
 
 server.tool("add_bookmark",
   "Add a bookmark. Target a folder by folder_path (created if missing, default 'Bookmarks bar') or by parent_id. A folder_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
@@ -133,6 +149,7 @@ server.tool("add_bookmark",
     parent_id: z.string().optional()
   },
   async ({ title, url, folder_path, parent_id }) => {
+    if (WRITES_OFF) return reportOnly("add_bookmark", { title, url, folder_path, parent_id });
     const pid = await resolveFolder(parent_id, folder_path);
     return ok(await bridge.call("create_bookmark", { parentId: pid, title, url }));
   });
@@ -145,6 +162,7 @@ server.tool("create_folder",
     parent_id: z.string().optional()
   },
   async ({ name, parent_path, parent_id }) => {
+    if (WRITES_OFF) return reportOnly("create_folder", { name, parent_path, parent_id });
     const pid = await resolveFolder(parent_id, parent_path);
     return ok(await bridge.call("create_folder", { parentId: pid, title: name }));
   });
@@ -153,6 +171,7 @@ server.tool("update_bookmark",
   "Update a node's title and/or a bookmark's URL, by id.",
   { id: z.string(), title: z.string().optional(), url: z.string().optional() },
   async ({ id, title, url }) => {
+    if (WRITES_OFF) return reportOnly("update_bookmark", { id, title, url });
     const out = {};
     if (title != null) out.renamed = await bridge.call("rename", { id, title });
     if (url != null) out.urlSet = await bridge.call("set_url", { id, url });
@@ -163,6 +182,7 @@ server.tool("move_bookmark",
   "Move a node into a folder by to_path (created if missing) or to_parent_id. A to_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { id: z.string(), to_path: z.string().optional(), to_parent_id: z.string().optional() },
   async ({ id, to_path, to_parent_id }) => {
+    if (WRITES_OFF) return reportOnly("move_bookmark", { id, to_path, to_parent_id });
     const pid = await resolveFolder(to_parent_id, to_path, null);
     if (!pid) throw new Error("provide to_path or to_parent_id");
     return ok(await bridge.call("move", { id, parentId: pid }));
@@ -171,7 +191,7 @@ server.tool("move_bookmark",
 server.tool("remove_bookmark",
   "Remove a bookmark by id, or a folder and its contents (set recursive=true for folders).",
   { id: z.string(), recursive: z.boolean().optional() },
-  async ({ id, recursive }) => { await bridge.call("remove", { id, recursive: !!recursive }); return ok({ removed: id, recursive: !!recursive }); });
+  async ({ id, recursive }) => { if (WRITES_OFF) return reportOnly("remove_bookmark", { id, recursive: !!recursive }); await bridge.call("remove", { id, recursive: !!recursive }); return ok({ removed: id, recursive: !!recursive }); });
 
 server.tool("find_duplicates",
   "List groups of bookmarks that share the same URL.",
@@ -182,6 +202,7 @@ server.tool("remove_duplicates",
   "Remove duplicate-URL bookmarks, keeping the first in each group. Use dry_run=true to preview without deleting.",
   { dry_run: z.boolean().optional() },
   async ({ dry_run }) => {
+    dry_run = dry_run || WRITES_OFF;
     const groups = await bridge.call("find_duplicates");
     const removals = [];
     for (const g of groups) for (const n of g.nodes.slice(1)) removals.push({ id: n.id, title: n.title, url: g.url, folder: n.folder });
@@ -215,6 +236,7 @@ server.tool("import_json",
       if (e.code === "ENOENT") throw new Error(`No file found at ${file_path}. Pass the path to a JSON file produced by export_json.`);
       throw new Error(`Could not read or parse ${file_path}: ${e.message}`);
     }
+    if (WRITES_OFF) return reportOnly("import_json", { file_path, into_path, into_parent_id, top_level_items: Array.isArray(data) ? data.length : 1 });
     const pid = await resolveFolder(into_parent_id, into_path, "Other bookmarks");
     const created = await bridge.call("import", { parentId: pid, data });
     return ok({ imported_into: pid, created });
@@ -224,6 +246,7 @@ server.tool("apply_moves",
   "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'.",
   { file_path: z.string().optional(), dry_run: z.boolean().optional(), delete_junk: z.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
+    dry_run = dry_run || WRITES_OFF;
     const path = file_path || PLAN_DEFAULT;
     let raw;
     try {
@@ -269,6 +292,7 @@ server.tool("remove_empty_folders",
   "Sweep the tree and delete folders that contain no bookmarks (bottom-up), e.g. folders left empty after a re-catalogue. Skips the permanent roots. dry_run=true lists them without deleting.",
   { dry_run: z.boolean().optional() },
   async ({ dry_run }) => {
+    dry_run = dry_run || WRITES_OFF;
     const [root] = await bridge.call("get_tree");
     const removed = [];
     async function visit(node, isPermanent) {

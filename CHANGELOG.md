@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.18]
+
+### Fixed
+- `create_folder` rejects a provided `name` that trims to empty (`""` or
+  whitespace-only) with `empty folder name` before any bridge call.
+  `update_bookmark` rejects a provided `title` the same way with
+  `empty title`. Those titles poison the path codec: `joinFolderPath` drops
+  `""`, so an empty-titled child under Bookmarks bar collides with the
+  permanent root path, and `splitPath` trims whitespace-only segments away
+  so the folder cannot be re-targeted. Omitting `title` on `update_bookmark`
+  is unchanged. A title with significant edge spaces (for example `" Dev"`)
+  is still forwarded; that case stays with the closed path-codec work.
+
 ## [1.1.17]
 
 ### Fixed

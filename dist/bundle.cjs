@@ -24993,6 +24993,9 @@ async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
 function rejectEmptyFilePath(file_path) {
   if (file_path != null && !String(file_path).trim()) throw new Error("empty file path");
 }
+function rejectEmptyProvidedTitle(value, message) {
+  if (value != null && !String(value).trim()) throw new Error(message);
+}
 server.tool(
   "bookmarks_status",
   "Report whether the Chrome extension bridge is connected and on what port. When connected, includes server_version and extension_version; a mismatch (or an extension that reports no version) means Chrome is still running an older unpacked copy and returns reload steps. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
@@ -25112,6 +25115,7 @@ server.tool(
     parent_id: external_exports.string().optional()
   },
   async ({ name, parent_path, parent_id }) => {
+    rejectEmptyProvidedTitle(name, "empty folder name");
     const pid = await resolveFolder(parent_id, parent_path);
     return ok(await bridge.call("create_folder", { parentId: pid, title: name }));
   }
@@ -25121,6 +25125,7 @@ server.tool(
   "Update a node's title and/or a bookmark's URL, by id.",
   { id: external_exports.string(), title: external_exports.string().optional(), url: external_exports.string().optional() },
   async ({ id, title, url }) => {
+    rejectEmptyProvidedTitle(title, "empty title");
     const out = {};
     if (title != null) out.renamed = await bridge.call("rename", { id, title });
     if (url != null) out.urlSet = await bridge.call("set_url", { id, url });

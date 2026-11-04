@@ -127,6 +127,17 @@ function rejectEmptyFilePath(file_path) {
   if (file_path != null && !String(file_path).trim()) throw new Error("empty file path");
 }
 
+// A provided folder name or node title that trims to empty is never forwarded
+// to chrome.bookmarks. "" is dropped by joinFolderPath, so an empty-titled
+// child collides with its parent path; whitespace-only titles survive join
+// but splitPath trims them away, so the node cannot be re-targeted by path.
+// null/undefined means the value was omitted (update_bookmark may rename
+// nothing). Significant edge spaces (" Dev") stay allowed — that is the
+// closed path-codec case, not this check.
+function rejectEmptyProvidedTitle(value, message) {
+  if (value != null && !String(value).trim()) throw new Error(message);
+}
+
 server.tool("bookmarks_status",
   "Report whether the Chrome extension bridge is connected and on what port. When connected, includes server_version and extension_version; a mismatch (or an extension that reports no version) means Chrome is still running an older unpacked copy and returns reload steps. When disconnected, returns step-by-step setup guidance — call this first if any other tool fails to reach the browser.",
   {},
@@ -248,6 +259,7 @@ server.tool("create_folder",
     parent_id: z.string().optional()
   },
   async ({ name, parent_path, parent_id }) => {
+    rejectEmptyProvidedTitle(name, "empty folder name");
     const pid = await resolveFolder(parent_id, parent_path);
     return ok(await bridge.call("create_folder", { parentId: pid, title: name }));
   });
@@ -256,6 +268,7 @@ server.tool("update_bookmark",
   "Update a node's title and/or a bookmark's URL, by id.",
   { id: z.string(), title: z.string().optional(), url: z.string().optional() },
   async ({ id, title, url }) => {
+    rejectEmptyProvidedTitle(title, "empty title");
     const out = {};
     if (title != null) out.renamed = await bridge.call("rename", { id, title });
     if (url != null) out.urlSet = await bridge.call("set_url", { id, url });

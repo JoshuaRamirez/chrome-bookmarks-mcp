@@ -6,7 +6,7 @@ const BRIDGE_URL = "ws://127.0.0.1:8765";
 // Plugin/package version this extension was shipped with. Must match
 // package.json "version" (and .claude-plugin/plugin.json). Chrome's
 // manifest.json "version" is a separate extension version and is not this.
-const PLUGIN_VERSION = "1.1.19";
+const PLUGIN_VERSION = "1.1.20";
 let _ws = null;
 
 function bridgeConnected() {
@@ -63,7 +63,9 @@ async function bridgeDispatch(method, p) {
 // Resolve (creating missing levels) a folder path. First segment must name a
 // permanent root: Bookmarks bar / Other bookmarks / Mobile bookmarks.
 // Alias allowlist is BookmarkStore.permanentRootAlias (lib/bookmarks.js),
-// kept in lockstep with src/server.js.
+// kept in lockstep with src/server.js. The root node is
+// BookmarkStore.permanentRootForAlias so a syncing account root wins when
+// Chrome returns two folders with the same folderType.
 async function ensurePath(segments) {
   if (!segments.length) throw new Error("empty path");
   const [root] = await chrome.bookmarks.getTree();
@@ -71,7 +73,7 @@ async function ensurePath(segments) {
   const first = segments[0].toLowerCase();
   const alias = BookmarkStore.permanentRootAlias(segments[0]);
   let cur = alias
-    ? (roots.find(r => r.folderType === alias[0]) || roots.find(r => r.id === alias[1]))
+    ? BookmarkStore.permanentRootForAlias(roots, alias)
     : roots.find(r => (r.title || "").toLowerCase() === first);
   if (!cur) throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
   for (let i = 1; i < segments.length; i++) {

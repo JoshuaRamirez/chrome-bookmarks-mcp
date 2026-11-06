@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.20]
+
+### Fixed
+- Permanent-root lookup prefers the syncing root when Chrome 134+ returns two
+  permanent folders with the same `folderType` (`bookmarks-bar`, `other`, or
+  `mobile`) and different `syncing` values. `ensurePath`,
+  `resolvePermanentRootTitle`, and `findPermanentRoot` share
+  `BookmarkStore.permanentRootForAlias`: `folderType` with `syncing === true`,
+  else the first `folderType` match, else the conventional id (`1` / `2` /
+  `3`). Path writes and alias list scope follow that root. A single root with
+  no `syncing` field still matches as before.
+
 ## [1.1.19]
 
 ### Fixed

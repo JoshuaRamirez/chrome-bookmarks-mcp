@@ -248,6 +248,11 @@ class BookmarkStore {
   }
 
   // Recreate portable JSON under a target folder. Returns count of nodes made.
+  // A folder title that trims to empty ("", "   ", tabs) is not a path segment
+  // splitPath can re-target. Skip that level and flatten children under the
+  // current parent, the same as today's falsy "". Significant edge spaces
+  // (" Dev") still create a folder, with the original title. Bookmark nodes
+  // (url present) keep the title they were given.
   static async importInto(parentId, data) {
     let created = 0;
     const rec = async (parent, node) => {
@@ -256,7 +261,10 @@ class BookmarkStore {
         created++;
       } else {
         let pid = parent;
-        if (node.title) {
+        // Non-strings keep the old truthy check. Strings must survive trim so
+        // whitespace-only titles are not created.
+        const title = typeof node.title === "string" ? node.title.trim() : node.title;
+        if (title) {
           const f = await chrome.bookmarks.create({ parentId: parent, title: node.title });
           pid = f.id; created++;
         }

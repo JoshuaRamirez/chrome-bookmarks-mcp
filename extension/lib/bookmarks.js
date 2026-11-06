@@ -59,32 +59,26 @@ const PERMANENT_ROOT_ALIASES = new Map([
 
 // First-segment alias → the live permanent root's title. Chrome localizes
 // those titles (German "Lesezeichenleiste", and so on), so an English display
-// string is not a valid rewrite. Lookup matches ensurePath: folderType, else
-// the conventional permanent id.
+// string is not a valid rewrite. Lookup matches ensurePath via
+// BookmarkStore.permanentRootForAlias.
 async function resolvePermanentRootTitle(segment) {
   const alias = BookmarkStore.permanentRootAlias(segment);
   if (!alias) return null;
   const [root] = await chrome.bookmarks.getTree();
-  const roots = root.children || [];
-  const node = roots.find((r) => r.folderType === alias[0])
-    || roots.find((r) => r.id === alias[1]);
+  const node = BookmarkStore.permanentRootForAlias(root.children || [], alias);
   const title = node && String(node.title || "").trim();
   return title || null;
 }
 
 // Live permanent root for a first path segment, using ensurePath's lookup:
-// alias via folderType/id, otherwise a case-insensitive title among
+// alias via permanentRootForAlias, otherwise a case-insensitive title among
 // root.children. Null when nothing matches — including substring lookalikes
 // such as Sidebar / Mother / Automobile.
 async function findPermanentRoot(segment) {
   const [root] = await chrome.bookmarks.getTree();
   const roots = root.children || [];
   const alias = BookmarkStore.permanentRootAlias(segment);
-  if (alias) {
-    return roots.find((r) => r.folderType === alias[0])
-      || roots.find((r) => r.id === alias[1])
-      || null;
-  }
+  if (alias) return BookmarkStore.permanentRootForAlias(roots, alias);
   const first = String(segment || "").toLowerCase();
   return roots.find((r) => (r.title || "").toLowerCase() === first) || null;
 }
@@ -139,6 +133,20 @@ class BookmarkStore {
     return PERMANENT_ROOT_ALIASES.get(key) || null;
   }
 
+  // Live permanent root for an alias [folderType, id]. Chrome 134+ can return
+  // two roots with the same folderType and different `syncing` values
+  // (account vs local). This package's contract is synced bookmarks, so
+  // prefer folderType + syncing === true. Otherwise keep the historical
+  // lookup: first folderType match, else the conventional permanent id.
+  // Shared by ensurePath, resolvePermanentRootTitle, and findPermanentRoot.
+  static permanentRootForAlias(roots, alias) {
+    const list = roots || [];
+    return list.find((r) => r.folderType === alias[0] && r.syncing === true)
+      || list.find((r) => r.folderType === alias[0])
+      || list.find((r) => r.id === alias[1])
+      || null;
+  }
+
   // Depth-first walk over the real tree. cb(node, parent, depth, pathTitles[]).
   static async walk(cb) {
     const [root] = await chrome.bookmarks.getTree();
@@ -181,7 +189,7 @@ class BookmarkStore {
   // segment. Emitted `folder` keeps Chrome's casing with / and \ escaped so
   // the string round-trips through splitPath. The first segment, when it is a
   // permanent-root alias, is replaced with that root's actual title from
-  // getTree() (folderType, else id — same as ensurePath) so "bar/Dev" scopes
+  // getTree() (permanentRootForAlias — same as ensurePath) so "bar/Dev" scopes
   // the bookmarks bar even when Chrome has localized the title. Later
   // segments stay literal titles. A first segment that is neither an alias
   // nor a live root title (same lookup as ensurePath) throws

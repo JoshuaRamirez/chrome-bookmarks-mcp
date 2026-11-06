@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
+## [1.1.19]
+
+### Fixed
+- `import_json` / `BookmarkStore.importInto` no longer creates a folder whose
+  title trims to empty (`"   "`, tabs). Those titles break path identity:
+  `list_folders` can emit a path that `splitPath` cannot re-target, so
+  `ensure_folder_path` and write tools miss the folder. The folder level is
+  skipped and its children land under the current parent, matching today's
+  empty `""` titles. A title with significant edge spaces (for example
+  `" Dev"`) is still created. Bookmark nodes (a `url` is present) keep their
+  existing title behavior.
+
 ## [1.1.18]
 
 ### Fixed

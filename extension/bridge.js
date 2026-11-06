@@ -6,7 +6,7 @@ const BRIDGE_URL = "ws://127.0.0.1:8765";
 // Plugin/package version this extension was shipped with. Must match
 // package.json "version" (and .claude-plugin/plugin.json). Chrome's
 // manifest.json "version" is a separate extension version and is not this.
-const PLUGIN_VERSION = "1.1.18";
+const PLUGIN_VERSION = "1.1.19";
 let _ws = null;
 
 function bridgeConnected() {

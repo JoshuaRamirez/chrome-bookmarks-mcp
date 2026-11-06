@@ -314,6 +314,63 @@ check("importInto recreates the tree (folder then children)",
   !folderFirst.url && folderFirst.title === "Imported",
   `created=${createdCount} nodes=${JSON.stringify(chrome.bookmarks._created)}`);
 
+// Whitespace-only folder titles are truthy, so the old `if (node.title)` check
+// created them. splitPath trims those segments away and the path cannot be
+// re-targeted. Skip the folder level (same as "") and land children on the
+// current parent. "" still flattens. " Dev" and a normal title still create.
+// A bookmark (url present) keeps a whitespace title.
+chrome.bookmarks._created.length = 0;
+const blankImport = { children: [
+  { title: "   ", children: [
+    { title: "Hidden", url: "https://hidden.example" },
+  ] },
+  { title: "\t", children: [
+    { title: "Tabbed", url: "https://tabbed.example" },
+  ] },
+  { title: "", children: [
+    { title: "Flat", url: "https://flat.example" },
+  ] },
+  { title: "Kept", children: [
+    { title: " \n ", children: [
+      { title: "Nested", url: "https://nested-blank.example" },
+    ] },
+  ] },
+  { title: " Dev", children: [
+    { title: "Edge", url: "https://edge.example" },
+  ] },
+  { title: "   ", url: "https://blank-bookmark.example" },
+] };
+const blankCount = await BookmarkStore.importInto("2", blankImport);
+const blankMade = chrome.bookmarks._created;
+const blankFolders = blankMade.filter((n) => !n.url);
+const byTitle = (title) => blankMade.find((n) => n.title === title);
+const kept = byTitle("Kept");
+const edgeFolder = byTitle(" Dev");
+check("importInto skips whitespace-only and empty folder titles",
+  blankCount === 8 &&
+  blankMade.length === 8 &&
+  blankFolders.length === 2 &&
+  blankFolders.every((f) => String(f.title).trim() !== "") &&
+  !blankMade.some((n) => !n.url && String(n.title).trim() === ""),
+  JSON.stringify(blankMade));
+check("importInto flattens children of blank folder titles under the parent",
+  byTitle("Hidden")?.url === "https://hidden.example" &&
+  byTitle("Hidden")?.parentId === "2" &&
+  byTitle("Tabbed")?.parentId === "2" &&
+  byTitle("Flat")?.parentId === "2" &&
+  byTitle("Nested")?.parentId === kept?.id &&
+  byTitle("Nested")?.parentId !== "2",
+  JSON.stringify(blankMade));
+check("importInto still creates a normal title and a significant edge-space title",
+  kept && !kept.url && kept.title === "Kept" && kept.parentId === "2" &&
+  edgeFolder && !edgeFolder.url && edgeFolder.title === " Dev" && edgeFolder.parentId === "2" &&
+  byTitle("Edge")?.parentId === edgeFolder.id,
+  JSON.stringify(blankMade));
+check("importInto keeps a whitespace bookmark title",
+  byTitle("   ")?.url === "https://blank-bookmark.example" &&
+  byTitle("   ")?.parentId === "2",
+  JSON.stringify(byTitle("   ")));
+
 // --- slash / backslash titles: emit → splitPath → same folder ---------------
 check("splitPath keeps ordinary slash paths as title segments",
   JSON.stringify(splitPath("Bookmarks bar / Dev")) === JSON.stringify(["Bookmarks bar", "Dev"]) &&

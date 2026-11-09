@@ -63,18 +63,15 @@ async function bridgeDispatch(method, p) {
 // Resolve (creating missing levels) a folder path. First segment must name a
 // permanent root: Bookmarks bar / Other bookmarks / Mobile bookmarks.
 // Alias allowlist is BookmarkStore.permanentRootAlias (lib/bookmarks.js),
-// kept in lockstep with src/server.js. The root node is
-// BookmarkStore.permanentRootForAlias so a syncing account root wins when
-// Chrome returns two folders with the same folderType.
+// kept in lockstep with src/server.js. The root node is findPermanentRoot —
+// the same node listBookmarks scopes to — so a syncing account root wins
+// when Chrome returns two folders with the same folderType and the same
+// title. Later segments use getChildren(cur.id); a sibling root that shares
+// the title is not searched. A non-alias first segment still matches the
+// first case-insensitive title among root.children.
 async function ensurePath(segments) {
   if (!segments.length) throw new Error("empty path");
-  const [root] = await chrome.bookmarks.getTree();
-  const roots = root.children || [];
-  const first = segments[0].toLowerCase();
-  const alias = BookmarkStore.permanentRootAlias(segments[0]);
-  let cur = alias
-    ? BookmarkStore.permanentRootForAlias(roots, alias)
-    : roots.find(r => (r.title || "").toLowerCase() === first);
+  let cur = await findPermanentRoot(segments[0]);
   if (!cur) throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
   for (let i = 1; i < segments.length; i++) {
     const seg = segments[i];

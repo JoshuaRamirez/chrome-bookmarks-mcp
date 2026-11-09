@@ -12,7 +12,10 @@ All notable changes to this project are documented here. Format loosely follows
   `resolvePermanentRootTitle`, and `findPermanentRoot` share
   `BookmarkStore.permanentRootForAlias`: `folderType` with `syncing === true`,
   else the first `folderType` match, else the conventional id (`1` / `2` /
-  `3`). Path writes and alias list scope follow that root. A single root with
+  `3`). An alias path (`bar/Dev`, `bookmarks-bar`, …) scopes `listBookmarks`
+  to that root's id and `ensurePath` walks `getChildren` of that id. A local
+  root and a syncing root that share a title (both `Bookmarks bar`) do not
+  both match. A non-alias title still matches by title. A single root with
   no `syncing` field still matches as before.
 
 ## [1.1.19]

@@ -59,13 +59,13 @@ const PERMANENT_ROOT_ALIASES = new Map([
 
 // First-segment alias → the live permanent root's title. Chrome localizes
 // those titles (German "Lesezeichenleiste", and so on), so an English display
-// string is not a valid rewrite. Lookup matches ensurePath via
-// BookmarkStore.permanentRootForAlias.
+// string is not a valid rewrite. The title is not an identity: a local root
+// and a syncing root share it (both "Bookmarks bar"). Callers that scope a
+// path use the node from findPermanentRoot (its id), not this string.
+// Lookup matches ensurePath via BookmarkStore.permanentRootForAlias.
 async function resolvePermanentRootTitle(segment) {
-  const alias = BookmarkStore.permanentRootAlias(segment);
-  if (!alias) return null;
-  const [root] = await chrome.bookmarks.getTree();
-  const node = BookmarkStore.permanentRootForAlias(root.children || [], alias);
+  const node = await findPermanentRoot(segment);
+  if (!BookmarkStore.permanentRootAlias(segment)) return null;
   const title = node && String(node.title || "").trim();
   return title || null;
 }
@@ -148,14 +148,18 @@ class BookmarkStore {
   }
 
   // Depth-first walk over the real tree. cb(node, parent, depth, pathTitles[]).
-  static async walk(cb) {
+  // rootId, when set, limits the walk to that direct child of the tree root
+  // (a permanent root selected by id). A same-titled sibling is not visited.
+  static async walk(cb, rootId) {
     const [root] = await chrome.bookmarks.getTree();
     const rec = (node, parent, depth, path) => {
       cb(node, parent, depth, path);
       (node.children || []).forEach(ch =>
         rec(ch, node, depth + 1, path.concat(node.title || "")));
     };
-    (root.children || []).forEach(ch => rec(ch, root, 0, []));
+    let children = root.children || [];
+    if (rootId != null) children = children.filter((ch) => ch.id === rootId);
+    children.forEach(ch => rec(ch, root, 0, []));
     return root;
   }
 
@@ -188,29 +192,38 @@ class BookmarkStore {
   // "Other Bookmarks" match Chrome titles, and a title like "CI/CD" is one
   // segment. Emitted `folder` keeps Chrome's casing with / and \ escaped so
   // the string round-trips through splitPath. The first segment, when it is a
-  // permanent-root alias, is replaced with that root's actual title from
-  // getTree() (permanentRootForAlias — same as ensurePath) so "bar/Dev" scopes
-  // the bookmarks bar even when Chrome has localized the title. Later
-  // segments stay literal titles. A first segment that is neither an alias
-  // nor a live root title (same lookup as ensurePath) throws
-  // top-level folder "…" not found — not a silent empty list. A localized
-  // title passed literally still matches. A resolved root whose child is
-  // missing or empty still returns [].
+  // permanent-root alias, selects one live root via findPermanentRoot
+  // (permanentRootForAlias — same node as ensurePath) and the walk is limited
+  // to that root's id. Later segments stay literal titles under that subtree.
+  // Two roots that share a title (both "Bookmarks bar", local and syncing)
+  // therefore do not both match "bar/Dev". A non-alias first segment still
+  // matches by case-insensitive title across the tree, including a localized
+  // title passed literally. A first segment that is neither an alias nor a
+  // live root title (same lookup as ensurePath) throws
+  // top-level folder "…" not found — not a silent empty list. A resolved
+  // root whose child is missing or empty still returns [].
   // A provided folderPath that normalizes to empty ("/", "///", whitespace)
   // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
   // / null) still lists everything.
   static async listBookmarks(folderPath) {
     let prefixSegs = null;
+    let scopeRootId = null;
     if (folderPath != null) {
       const segs = splitPath(folderPath);
       if (!segs.length) throw new Error("empty path");
-      const rootTitle = await resolvePermanentRootTitle(segs[0]);
-      if (rootTitle) {
-        segs[0] = rootTitle;
-      } else if (!(await findPermanentRoot(segs[0]))) {
+      const selected = await findPermanentRoot(segs[0]);
+      if (!selected) {
         throw new Error(`top-level folder "${segs[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
       }
-      prefixSegs = segs.map((s) => s.toLowerCase());
+      // Alias → one root id. Rewriting the segment to the shared title would
+      // also match the other permanent root. Non-alias titles stay a
+      // whole-tree title prefix, which is what a literal localized name does.
+      if (BookmarkStore.permanentRootAlias(segs[0])) {
+        scopeRootId = selected.id;
+        prefixSegs = segs.slice(1).map((s) => s.toLowerCase());
+      } else {
+        prefixSegs = segs.map((s) => s.toLowerCase());
+      }
     }
     const out = [];
     await BookmarkStore.walk((node, _p, _d, path) => {
@@ -218,11 +231,12 @@ class BookmarkStore {
       const titles = path.filter(Boolean);
       const folder = joinFolderPath(titles) || "(root)";
       if (prefixSegs) {
-        const key = titles.map((s) => String(s).trim().toLowerCase());
+        const comparable = scopeRootId != null ? path.slice(1) : path;
+        const key = comparable.filter(Boolean).map((s) => String(s).trim().toLowerCase());
         if (key.length < prefixSegs.length || !prefixSegs.every((s, i) => s === key[i])) return;
       }
       out.push({ id: node.id, title: node.title, url: node.url, folder });
-    });
+    }, scopeRootId);
     return out;
   }
 

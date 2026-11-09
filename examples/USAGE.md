@@ -16,8 +16,8 @@ Claude calls `bookmarks_status`. Connected looks like:
 {
   "connected": true,
   "port": 8765,
-  "server_version": "1.1.19",
-  "extension_version": "1.1.19",
+  "server_version": "1.1.20",
+  "extension_version": "1.1.20",
   "message": "Extension bridge connected — all bookmark tools are ready."
 }
 ```

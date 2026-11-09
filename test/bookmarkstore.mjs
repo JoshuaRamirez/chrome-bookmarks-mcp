@@ -113,8 +113,11 @@ globalThis.chrome = {
   },
 };
 
-// Load the classic-script class into this context.
+// Load the classic-script class into this context, then the bridge so
+// ensurePath is the same function the extension ships (it calls
+// BookmarkStore.permanentRootForAlias).
 vm.runInThisContext(readFileSync(join(__dirname, "..", "extension", "lib", "bookmarks.js"), "utf8"));
+vm.runInThisContext(readFileSync(join(__dirname, "..", "extension", "bridge.js"), "utf8"));
 const BookmarkStore = globalThis.BookmarkStore;
 
 let failed = 0;
@@ -464,6 +467,105 @@ const searchJenkins = await BookmarkStore.searchWithPaths("Jenkins");
 check("searchWithPaths emits escaped folder paths for slash titles",
   searchJenkins.length === 1 && searchJenkins[0].folder === "Bookmarks bar / CI\\/CD",
   JSON.stringify(searchJenkins));
+
+// Chrome 134+ can return two permanent roots with the same folderType, the
+// same title (both "Bookmarks bar"), and different syncing values. The local
+// root is first. Alias lookup must prefer syncing and scope by that node's
+// id — a title rewrite would match Dev under every Bookmarks bar, including
+// the original root that also keeps the title "Bookmarks bar".
+const savedChildren = TREE.children.slice();
+const localBar = {
+  id: "local-bar", title: "Bookmarks bar", folderType: "bookmarks-bar",
+  syncing: false, parentId: "0", children: [
+    { id: "local-dev", title: "Dev", parentId: "local-bar", children: [
+      { id: "local-bm", title: "Local only", url: "https://local.example", parentId: "local-dev" },
+    ] },
+  ],
+};
+const accountBar = {
+  id: "acct-bar", title: "Bookmarks bar", folderType: "bookmarks-bar",
+  syncing: true, parentId: "0", children: [
+    { id: "acct-dev", title: "Dev", parentId: "acct-bar", children: [
+      { id: "acct-bm", title: "Synced", url: "https://sync.example", parentId: "acct-dev" },
+    ] },
+  ],
+};
+const indexNode = (node) => {
+  ALL.push(node);
+  (node.children || []).forEach(indexNode);
+};
+indexNode(localBar);
+indexNode(accountBar);
+const barForAlias = TREE.children.find((n) => n.id === "1");
+TREE.children = [localBar, ...savedChildren, accountBar];
+try {
+  const syncedRoot = await findPermanentRoot("bar");
+  check("findPermanentRoot prefers the syncing bookmarks-bar over an earlier local root",
+    syncedRoot?.id === "acct-bar" && syncedRoot.syncing === true,
+    syncedRoot && syncedRoot.id);
+
+  const syncedTitle = await resolvePermanentRootTitle("toolbar");
+  check("resolvePermanentRootTitle returns the selected syncing root's title",
+    syncedTitle === "Bookmarks bar" && syncedTitle === syncedRoot.title,
+    syncedTitle);
+
+  const ensured = await ensurePath(["bookmarks-bar", "Dev"]);
+  check("ensurePath prefers the syncing bookmarks-bar",
+    ensured?.id === "acct-dev" && ensured?.title === "Dev" && ensured?.parentId === "acct-bar",
+    JSON.stringify(ensured));
+
+  const scopedSync = await BookmarkStore.listBookmarks("bar/Dev");
+  check("listBookmarks bar/Dev returns only the syncing root's bookmark",
+    scopedSync.length === 1 &&
+    scopedSync[0].id === "acct-bm" &&
+    scopedSync[0].url === "https://sync.example" &&
+    scopedSync[0].folder === "Bookmarks bar / Dev" &&
+    !scopedSync.some((b) => b.id === "local-bm" || b.id === "100" || b.id === "101"),
+    JSON.stringify(scopedSync));
+
+  // No syncing root: first folderType match, not a later conventional id.
+  // Same shared title — scope stays on that node's id.
+  accountBar.syncing = false;
+  const firstType = await findPermanentRoot("bar");
+  const firstTitle = await resolvePermanentRootTitle("bookmarks bar");
+  const firstPath = await ensurePath(["bar", "Dev"]);
+  const scopedLocal = await BookmarkStore.listBookmarks("bar/Dev");
+  check("alias lookup falls back to the first folderType match when none are syncing",
+    firstType?.id === "local-bar" &&
+    firstTitle === "Bookmarks bar" &&
+    firstPath?.id === "local-dev" &&
+    firstPath?.parentId === "local-bar" &&
+    scopedLocal.length === 1 &&
+    scopedLocal[0].id === "local-bm" &&
+    scopedLocal[0].folder === "Bookmarks bar / Dev",
+    JSON.stringify({ id: firstType?.id, firstTitle, firstPath, scopedLocal }));
+
+  // No folderType: conventional permanent id, even if another root is first.
+  const typed = [localBar, accountBar, barForAlias];
+  const savedTypes = typed.map((n) => n.folderType);
+  for (const n of typed) delete n.folderType;
+  try {
+    const viaId = await findPermanentRoot("bar");
+    const viaTitle = await resolvePermanentRootTitle("toolbar");
+    const viaPath = await ensurePath(["bookmarks-bar", "Dev"]);
+    const scopedId = await BookmarkStore.listBookmarks("bar/Dev");
+    check("alias lookup falls back to the conventional permanent id",
+      viaId?.id === "1" &&
+      viaTitle === "Bookmarks bar" &&
+      viaPath?.id === "10" &&
+      viaPath?.parentId === "1" &&
+      idsOf(scopedId) === "100,101" &&
+      scopedId.every((b) => b.folder === "Bookmarks bar / Dev"),
+      JSON.stringify({ id: viaId?.id, viaTitle, viaPath, scopedId }));
+  } finally {
+    typed.forEach((n, i) => {
+      if (savedTypes[i] === undefined) delete n.folderType;
+      else n.folderType = savedTypes[i];
+    });
+  }
+} finally {
+  TREE.children = savedChildren;
+}
 
 console.log(failed ? `\nBOOKMARKSTORE TESTS FAILED (${failed})` : "\nBOOKMARKSTORE TESTS PASSED");
 process.exit(failed ? 1 : 0);

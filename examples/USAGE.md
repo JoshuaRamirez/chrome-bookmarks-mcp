@@ -13,11 +13,23 @@ through `chrome.bookmarks`, so they sync across your signed-in Chrome instances.
 Claude calls `bookmarks_status`. Connected looks like:
 
 ```json
-{ "connected": true, "port": 8765, "message": "Extension bridge connected — all bookmark tools are ready." }
+{
+  "connected": true,
+  "port": 8765,
+  "server_version": "1.1.19",
+  "extension_version": "1.1.19",
+  "message": "Extension bridge connected — all bookmark tools are ready."
+}
 ```
 
+`extension_version` must match `server_version`. If it is missing or different,
+the response includes a `warning` and a `fix` list: Chrome is still on an older
+unpacked folder. Load the `extension_dir` it prints, then ask again.
+
 If it comes back `connected: false`, the response includes a `fix` list — follow
-those steps (open Chrome, load the extension unpacked) and ask again.
+those steps and ask again. That is usually open Chrome and load the extension
+unpacked, but `connected: false` can also be a bind failure (EADDRINUSE — another
+server already on the port); follow the `fix` list the tool returns.
 
 ## 2. Get the lay of the land
 
@@ -67,14 +79,25 @@ Large moves are worth doing deliberately:
    > **You:** Export all my bookmarks to ~/bookmarks-backup.json
    Claude calls `export_json` with that `file_path`. To restore later, ask Claude
    to import it — `import_json` recreates that tree under a folder you choose
-   (default `Other bookmarks`).
+   (default `Other bookmarks`). An `into_path`'s top level must be one of
+   `Bookmarks bar`, `Other bookmarks`, or `Mobile bookmarks`.
 
 2. **Preview the moves.** `apply_moves` reads a tab-separated plan with columns
    `id, proposed, current, via, title, url` — one row per bookmark, where
    `proposed` is the destination folder path (or the literal `DELETE?` to drop a
-   row when `delete_junk: true`). Only `id` and `proposed` drive the action; the
-   rest is human context. See **[sample-plan.tsv](sample-plan.tsv)** for a
-   working example. Run with `dry_run: true` first to see counts and targets:
+   row when `delete_junk: true`). Each proposed folder path's top level must be
+   one of `Bookmarks bar`, `Other bookmarks`, or `Mobile bookmarks` (except the
+   literal `DELETE?` when `delete_junk` is used). Only `id` and `proposed` drive
+   the action; the rest is human context. See **[sample-plan.tsv](sample-plan.tsv)**
+   for a working example.
+
+   **[`tools/classify.py`](../tools/classify.py)** is the starter plan generator:
+   it reads Chrome's AccountBookmarks and writes a TSV with those columns — it
+   moves nothing. Review the file, then feed it to `apply_moves` (`dry_run`
+   first). The script's docstring covers `BOOKMARKS_SRC` / `MOVES_OUT` and
+   optional `classify.rules.json`.
+
+   Run with `dry_run: true` first to see counts and targets:
 
    ```json
    { "dry_run": true, "moved": 3, "deleted": 0, "skipped": 1,

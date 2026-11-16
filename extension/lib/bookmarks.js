@@ -4,6 +4,91 @@
 // Loaded as a classic script (importScripts in the worker, <script> in pages),
 // so it exposes the class on globalThis by name.
 
+// Path codec — keep in lockstep with src/folder-path.js.
+// Escape \ then / in each title so "A / B / C" paths round-trip when a title
+// contains / or \. splitPath is the inverse: split on unescaped /, unescape.
+function escapePathSegment(title) {
+  return String(title ?? "").replace(/\\/g, "\\\\").replace(/\//g, "\\/");
+}
+function joinFolderPath(titles) {
+  return (titles || []).filter(Boolean).map(escapePathSegment).join(" / ");
+}
+function splitPath(p) {
+  const s = String(p || "");
+  const out = [];
+  let buf = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") {
+      const next = s[i + 1];
+      if (next === "/" || next === "\\") {
+        buf += next;
+        i++;
+        continue;
+      }
+      buf += ch;
+      continue;
+    }
+    if (ch === "/") {
+      out.push(buf.trim());
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf.trim());
+  return out.filter(Boolean);
+}
+
+// Allowlist of first-segment aliases for Chrome's three permanent roots.
+// Exact match after lowercasing and collapsing whitespace — keep in lockstep
+// with permanentRootAlias in src/server.js. Substring tests falsely accept
+// Sidebar / Mother / Automobile (they contain bar / other / mobile).
+// ensurePath (extension/bridge.js) calls BookmarkStore.permanentRootAlias so
+// list and write paths share this Map.
+const PERMANENT_ROOT_ALIASES = new Map([
+  ["bar", ["bookmarks-bar", "1"]],
+  ["toolbar", ["bookmarks-bar", "1"]],
+  ["bookmarks bar", ["bookmarks-bar", "1"]],
+  ["bookmarks-bar", ["bookmarks-bar", "1"]],
+  ["other", ["other", "2"]],
+  ["other bookmarks", ["other", "2"]],
+  ["mobile", ["mobile", "3"]],
+  ["mobile bookmarks", ["mobile", "3"]],
+]);
+
+// First-segment alias → the live permanent root's title. Chrome localizes
+// those titles (German "Lesezeichenleiste", and so on), so an English display
+// string is not a valid rewrite. Lookup matches ensurePath: folderType, else
+// the conventional permanent id.
+async function resolvePermanentRootTitle(segment) {
+  const alias = BookmarkStore.permanentRootAlias(segment);
+  if (!alias) return null;
+  const [root] = await chrome.bookmarks.getTree();
+  const roots = root.children || [];
+  const node = roots.find((r) => r.folderType === alias[0])
+    || roots.find((r) => r.id === alias[1]);
+  const title = node && String(node.title || "").trim();
+  return title || null;
+}
+
+// Live permanent root for a first path segment, using ensurePath's lookup:
+// alias via folderType/id, otherwise a case-insensitive title among
+// root.children. Null when nothing matches — including substring lookalikes
+// such as Sidebar / Mother / Automobile.
+async function findPermanentRoot(segment) {
+  const [root] = await chrome.bookmarks.getTree();
+  const roots = root.children || [];
+  const alias = BookmarkStore.permanentRootAlias(segment);
+  if (alias) {
+    return roots.find((r) => r.folderType === alias[0])
+      || roots.find((r) => r.id === alias[1])
+      || null;
+  }
+  const first = String(segment || "").toLowerCase();
+  return roots.find((r) => (r.title || "").toLowerCase() === first) || null;
+}
+
 class BookmarkStore {
   // Conventional permanent ids; treated as non-editable roots.
   static PERMANENT_PARENT = "0"; // children of the tree root are the permanent folders
@@ -25,13 +110,15 @@ class BookmarkStore {
 
   // Like search(), but each hit carries its containing folder path — the context
   // callers actually want ("where is this bookmark?"). chrome.bookmarks.search
-  // returns only parentId, so we resolve every folder's path once and join.
+  // returns folders (no url) as well as bookmarks; we keep only url hits — the
+  // same filter listBookmarks / findDuplicates / the manager UI already apply.
+  // Search returns only parentId, so we resolve every folder's path once and join.
   static async searchWithPaths(query) {
-    const hits = await chrome.bookmarks.search(query);
+    const hits = (await chrome.bookmarks.search(query)).filter(h => h.url);
     if (!hits.length) return [];
-    const folderPath = new Map(); // folder id -> "A / B / C" (including itself)
+    const folderPath = new Map(); // folder id -> escaped "A / B / C" (including itself)
     await BookmarkStore.walk((node, _p, _d, path) => {
-      if (!node.url) folderPath.set(node.id, path.concat(node.title).filter(Boolean).join(" / "));
+      if (!node.url) folderPath.set(node.id, joinFolderPath(path.concat(node.title)));
     });
     return hits.map(h => ({
       id: h.id,
@@ -43,6 +130,13 @@ class BookmarkStore {
 
   static isPermanent(node) {
     return node.id === "0" || node.parentId === BookmarkStore.PERMANENT_PARENT;
+  }
+
+  // [folderType, id] for a permanent-root alias, or null. Map lookup only —
+  // never a substring test. Same key normalization as src/server.js.
+  static permanentRootAlias(segment) {
+    const key = String(segment || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return PERMANENT_ROOT_ALIASES.get(key) || null;
   }
 
   // Depth-first walk over the real tree. cb(node, parent, depth, pathTitles[]).
@@ -64,7 +158,7 @@ class BookmarkStore {
       if (!node.url) {
         out.push({
           id: node.id, title: node.title, depth,
-          path: path.concat(node.title).filter(Boolean).join(" / ")
+          path: joinFolderPath(path.concat(node.title))
         });
       }
     });
@@ -81,15 +175,44 @@ class BookmarkStore {
   // folder path (e.g. "Bookmarks bar / Dev"), matching that folder and anything
   // beneath it. Flat + scoped keeps results bounded — the whole nested tree is
   // rarely what a caller wants and can be very large.
+  // folder_path compare is case-insensitive on real title segments (splitPath
+  // unescapes; no join→re-split) so "bookmarks bar/dev" and USAGE
+  // "Other Bookmarks" match Chrome titles, and a title like "CI/CD" is one
+  // segment. Emitted `folder` keeps Chrome's casing with / and \ escaped so
+  // the string round-trips through splitPath. The first segment, when it is a
+  // permanent-root alias, is replaced with that root's actual title from
+  // getTree() (folderType, else id — same as ensurePath) so "bar/Dev" scopes
+  // the bookmarks bar even when Chrome has localized the title. Later
+  // segments stay literal titles. A first segment that is neither an alias
+  // nor a live root title (same lookup as ensurePath) throws
+  // top-level folder "…" not found — not a silent empty list. A localized
+  // title passed literally still matches. A resolved root whose child is
+  // missing or empty still returns [].
+  // A provided folderPath that normalizes to empty ("/", "///", whitespace)
+  // throws "empty path" — same as ensurePath / apply_moves. Omit (undefined
+  // / null) still lists everything.
   static async listBookmarks(folderPath) {
-    const prefix = folderPath
-      ? String(folderPath).split("/").map((s) => s.trim()).filter(Boolean).join(" / ")
-      : "";
+    let prefixSegs = null;
+    if (folderPath != null) {
+      const segs = splitPath(folderPath);
+      if (!segs.length) throw new Error("empty path");
+      const rootTitle = await resolvePermanentRootTitle(segs[0]);
+      if (rootTitle) {
+        segs[0] = rootTitle;
+      } else if (!(await findPermanentRoot(segs[0]))) {
+        throw new Error(`top-level folder "${segs[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
+      }
+      prefixSegs = segs.map((s) => s.toLowerCase());
+    }
     const out = [];
     await BookmarkStore.walk((node, _p, _d, path) => {
       if (!node.url) return;
-      const folder = path.filter(Boolean).join(" / ") || "(root)";
-      if (prefix && folder !== prefix && !folder.startsWith(prefix + " / ")) return;
+      const titles = path.filter(Boolean);
+      const folder = joinFolderPath(titles) || "(root)";
+      if (prefixSegs) {
+        const key = titles.map((s) => String(s).trim().toLowerCase());
+        if (key.length < prefixSegs.length || !prefixSegs.every((s, i) => s === key[i])) return;
+      }
       out.push({ id: node.id, title: node.title, url: node.url, folder });
     });
     return out;
@@ -101,7 +224,7 @@ class BookmarkStore {
     await BookmarkStore.walk((node, _p, _d, path) => {
       if (!node.url) return;
       const arr = byUrl.get(node.url) || [];
-      arr.push({ id: node.id, title: node.title, folder: path.filter(Boolean).join(" / ") || "(root)" });
+      arr.push({ id: node.id, title: node.title, folder: joinFolderPath(path.filter(Boolean)) || "(root)" });
       byUrl.set(node.url, arr);
     });
     return [...byUrl.entries()]
@@ -125,6 +248,11 @@ class BookmarkStore {
   }
 
   // Recreate portable JSON under a target folder. Returns count of nodes made.
+  // A folder title that trims to empty ("", "   ", tabs) is not a path segment
+  // splitPath can re-target. Skip that level and flatten children under the
+  // current parent, the same as today's falsy "". Significant edge spaces
+  // (" Dev") still create a folder, with the original title. Bookmark nodes
+  // (url present) keep the title they were given.
   static async importInto(parentId, data) {
     let created = 0;
     const rec = async (parent, node) => {
@@ -133,7 +261,10 @@ class BookmarkStore {
         created++;
       } else {
         let pid = parent;
-        if (node.title) {
+        // Non-strings keep the old truthy check. Strings must survive trim so
+        // whitespace-only titles are not created.
+        const title = typeof node.title === "string" ? node.title.trim() : node.title;
+        if (title) {
           const f = await chrome.bookmarks.create({ parentId: parent, title: node.title });
           pid = f.id; created++;
         }

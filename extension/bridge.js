@@ -3,6 +3,10 @@
 // shared BookmarkStore and TabStore (lib/, imported first by background.js).
 
 const BRIDGE_URL = "ws://127.0.0.1:8765";
+// Plugin/package version this extension was shipped with. Must match
+// package.json "version" (and .claude-plugin/plugin.json). Chrome's
+// manifest.json "version" is a separate extension version and is not this.
+const PLUGIN_VERSION = "1.2.0";
 let _ws = null;
 
 function bridgeConnected() {
@@ -15,7 +19,10 @@ function bridgeConnect() {
   console.log("[bridge] connecting to", BRIDGE_URL);
   try { ws = new WebSocket(BRIDGE_URL); } catch (e) { console.log("[bridge] construct failed:", e && e.message); return; }
   _ws = ws;
-  ws.onopen = () => { console.log("[bridge] OPEN"); try { ws.send(JSON.stringify({ hello: "bookmark-manager" })); } catch (_) {} };
+  ws.onopen = () => {
+    console.log("[bridge] OPEN");
+    try { ws.send(JSON.stringify({ hello: "bookmark-manager", version: PLUGIN_VERSION })); } catch (_) {}
+  };
   ws.onmessage = async (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch (_) { return; }
@@ -68,14 +75,14 @@ async function bridgeDispatch(method, p) {
 
 // Resolve (creating missing levels) a folder path. First segment must name a
 // permanent root: Bookmarks bar / Other bookmarks / Mobile bookmarks.
+// Alias allowlist is BookmarkStore.permanentRootAlias (lib/bookmarks.js),
+// kept in lockstep with src/server.js.
 async function ensurePath(segments) {
   if (!segments.length) throw new Error("empty path");
   const [root] = await chrome.bookmarks.getTree();
   const roots = root.children || [];
   const first = segments[0].toLowerCase();
-  const alias = /bar|toolbar/.test(first) ? ["bookmarks-bar", "1"]
-              : /other/.test(first) ? ["other", "2"]
-              : /mobile/.test(first) ? ["mobile", "3"] : null;
+  const alias = BookmarkStore.permanentRootAlias(segments[0]);
   let cur = alias
     ? (roots.find(r => r.folderType === alias[0]) || roots.find(r => r.id === alias[1]))
     : roots.find(r => (r.title || "").toLowerCase() === first);

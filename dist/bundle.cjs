@@ -24807,6 +24807,7 @@ var Bridge = class {
     this.pending = /* @__PURE__ */ new Map();
     this.listening = false;
     this.bindError = null;
+    this.extensionVersion = "";
   }
   start() {
     this._listen();
@@ -24829,10 +24830,14 @@ var Bridge = class {
     });
     this.wss.on("connection", (ws) => {
       this.sock = ws;
+      this.extensionVersion = "";
       this.log("[bridge] extension connected");
-      ws.on("message", (buf) => this._onMessage(buf));
+      ws.on("message", (buf) => this._onMessage(ws, buf));
       ws.on("close", () => {
-        if (this.sock === ws) this.sock = null;
+        if (this.sock === ws) {
+          this.sock = null;
+          this.extensionVersion = "";
+        }
         this.log("[bridge] extension disconnected");
       });
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
@@ -24860,10 +24865,12 @@ var Bridge = class {
       connected: this.connected(),
       listening: this.listening,
       port: this.port,
-      bindError: this.bindError
+      bindError: this.bindError,
+      extensionVersion: this.extensionVersion
     };
   }
-  _onMessage(buf) {
+  _onMessage(ws, buf) {
+    if (this.sock !== ws) return;
     let msg;
     try {
       msg = JSON.parse(buf.toString());
@@ -24871,7 +24878,8 @@ var Bridge = class {
       return;
     }
     if (msg.hello) {
-      this.log(`[bridge] hello from ${msg.hello}`);
+      this.extensionVersion = typeof msg.version === "string" ? msg.version.trim() : "";
+      this.log(`[bridge] hello from ${msg.hello}${this.extensionVersion ? " " + this.extensionVersion : " (no version)"}`);
       return;
     }
     if (msg.id != null && this.pending.has(msg.id)) {
@@ -24908,6 +24916,34 @@ var Bridge = class {
   }
 };
 
+// src/folder-path.js
+function splitPath(p) {
+  const s = String(p || "");
+  const out = [];
+  let buf = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") {
+      const next = s[i + 1];
+      if (next === "/" || next === "\\") {
+        buf += next;
+        i++;
+        continue;
+      }
+      buf += ch;
+      continue;
+    }
+    if (ch === "/") {
+      out.push(buf.trim());
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf.trim());
+  return out.filter(Boolean);
+}
+
 // src/server.js
 var import_meta = {};
 var PLAN_DEFAULT = process.env.BOOKMARK_PLAN_FILE || (0, import_node_path.join)((0, import_node_os.homedir)() || (0, import_node_os.tmpdir)(), ".chrome-bookmarks-mcp", "proposed-moves.tsv");
@@ -24918,6 +24954,19 @@ var EXTENSION_DIR = (() => {
     if ((0, import_node_fs.existsSync)((0, import_node_path.join)(p, "manifest.json"))) return p;
   }
   return (0, import_node_path.resolve)(here, "../extension");
+})();
+var SERVER_VERSION = (() => {
+  const here = typeof __dirname !== "undefined" ? __dirname : (0, import_node_path.dirname)((0, import_node_url.fileURLToPath)(import_meta.url));
+  for (const rel of ["../package.json", "./package.json"]) {
+    const p = (0, import_node_path.resolve)(here, rel);
+    if (!(0, import_node_fs.existsSync)(p)) continue;
+    try {
+      const version2 = JSON.parse((0, import_node_fs.readFileSync)(p, "utf8")).version;
+      if (typeof version2 === "string" && version2.trim()) return version2.trim();
+    } catch {
+    }
+  }
+  return "";
 })();
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
@@ -24947,24 +24996,77 @@ bridge.call = (op, params) => {
   return bridgeCall(op, params);
 };
 var reportOnly = (tool, args) => ok({ writes: "off", tool, would: args, note: "BOOKMARK_WRITES=off: nothing was changed in Chrome." });
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.2.0" });
+var server = new McpServer({ name: "chrome-bookmarks", version: SERVER_VERSION || "0.0.0" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
-var splitPath = (p) => String(p || "").split("/").map((s) => s.trim()).filter(Boolean);
+var PERMANENT_ROOT_ALIASES = /* @__PURE__ */ new Map([
+  ["bar", ["bookmarks-bar", "1"]],
+  ["toolbar", ["bookmarks-bar", "1"]],
+  ["bookmarks bar", ["bookmarks-bar", "1"]],
+  ["bookmarks-bar", ["bookmarks-bar", "1"]],
+  ["other", ["other", "2"]],
+  ["other bookmarks", ["other", "2"]],
+  ["mobile", ["mobile", "3"]],
+  ["mobile bookmarks", ["mobile", "3"]]
+]);
+function permanentRootAlias(segment) {
+  const key = String(segment || "").toLowerCase().replace(/\s+/g, " ").trim();
+  return PERMANENT_ROOT_ALIASES.get(key) || null;
+}
+function assertPermanentRoot(segments) {
+  if (!segments.length) throw new Error("empty path");
+  if (!permanentRootAlias(segments[0])) {
+    throw new Error(`top-level folder "${segments[0]}" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`);
+  }
+}
 async function resolveFolder(parent_id, path, fallback = "Bookmarks bar") {
-  if (parent_id) return parent_id;
-  const folder = await bridge.call("ensure_path", { path: splitPath(path || fallback) });
+  if (parent_id != null) {
+    if (!String(parent_id).trim()) throw new Error("empty parent id");
+    return parent_id;
+  }
+  const raw = path != null ? path : fallback;
+  if (raw == null) return null;
+  const segments = splitPath(raw);
+  if (!segments.length) throw new Error("empty path");
+  const folder = await bridge.call("ensure_path", { path: segments });
   return folder.id;
+}
+function rejectEmptyFilePath(file_path) {
+  if (file_path != null && !String(file_path).trim()) throw new Error("empty file path");
+}
+function rejectEmptyProvidedTitle(value, message) {
+  if (value != null && !String(value).trim()) throw new Error(message);
 }
 server.tool(
   "bookmarks_status",
-  "Report whether the Chrome extension bridge is connected and on what port. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
+  "Report whether the Chrome extension bridge is connected and on what port. When connected, includes server_version and extension_version; a mismatch (or an extension that reports no version) means Chrome is still running an older unpacked copy and returns reload steps. When disconnected, returns step-by-step setup guidance \u2014 call this first if any other tool fails to reach the browser.",
   {},
   async () => {
     const s = bridge.status();
     if (s.connected) {
-      return ok({ connected: true, port: s.port, writes: WRITES_OFF ? "off" : "on", message: "Extension bridge connected \u2014 all bookmark tools are ready." });
+      const server_version = SERVER_VERSION;
+      const extension_version = s.extensionVersion || null;
+      const mismatch = extension_version !== server_version;
+      const body = {
+        connected: true,
+        port: s.port,
+        writes: WRITES_OFF ? "off" : "on",
+        server_version,
+        extension_version,
+        message: mismatch ? `Extension bridge connected, but the loaded extension does not match this server (${server_version || "unknown"}). Chrome is still running an older unpacked copy, so bookmark tools may keep the old behavior (including silent empty list_bookmarks results).` : "Extension bridge connected \u2014 all bookmark tools are ready."
+      };
+      if (mismatch) {
+        body.warning = extension_version ? `extension_version ${extension_version} does not match server_version ${server_version}. Reload the unpacked extension from the current folder.` : "The connected extension did not report a plugin version. It is an older build and does not include this release's bookmark fixes.";
+        body.extension_dir = EXTENSION_DIR;
+        body.fix = [
+          "Open chrome://extensions.",
+          "Remove the old unpacked Bookmark Manager extension, or reload it only if it already points at the folder below. Chrome does not follow a previous versioned cache path after a marketplace upgrade.",
+          `Click 'Load unpacked' and select this exact folder: ${EXTENSION_DIR}`,
+          "Then re-run bookmarks_status and confirm extension_version matches server_version."
+        ];
+      }
+      return ok(body);
     }
     if (s.bindError) {
       const inUse = s.bindError.code === "EADDRINUSE";
@@ -25003,7 +25105,10 @@ server.tool(
   "list_bookmarks",
   "List bookmarks as a flat array of {id, title, url, folder}. Optionally scope to a folder path (e.g. 'Bookmarks bar/Dev') to avoid returning the whole tree; omit to list everything.",
   { folder_path: external_exports.string().optional().describe("only list bookmarks within this folder path and its subfolders") },
-  async ({ folder_path }) => ok(await bridge.call("list_bookmarks", { folderPath: folder_path }))
+  async ({ folder_path }) => {
+    if (folder_path != null && !splitPath(folder_path).length) throw new Error("empty path");
+    return ok(await bridge.call("list_bookmarks", { folderPath: folder_path }));
+  }
 );
 server.tool(
   "list_folders",
@@ -25027,7 +25132,12 @@ server.tool(
   "ensure_folder_path",
   "Ensure a nested folder path exists (e.g. 'Bookmarks bar/Work/Reports'), creating missing levels. Returns the leaf folder. Top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { path: external_exports.string().describe("slash-separated folder path") },
-  async ({ path }) => WRITES_OFF ? reportOnly("ensure_folder_path", { path }) : ok(await bridge.call("ensure_path", { path: splitPath(path) }))
+  async ({ path }) => {
+    const segments = splitPath(path);
+    if (!segments.length) throw new Error("empty path");
+    if (WRITES_OFF) return reportOnly("ensure_folder_path", { path });
+    return ok(await bridge.call("ensure_path", { path: segments }));
+  }
 );
 server.tool(
   "add_bookmark",
@@ -25053,6 +25163,7 @@ server.tool(
     parent_id: external_exports.string().optional()
   },
   async ({ name, parent_path, parent_id }) => {
+    rejectEmptyProvidedTitle(name, "empty folder name");
     if (WRITES_OFF) return reportOnly("create_folder", { name, parent_path, parent_id });
     const pid = await resolveFolder(parent_id, parent_path);
     return ok(await bridge.call("create_folder", { parentId: pid, title: name }));
@@ -25063,6 +25174,7 @@ server.tool(
   "Update a node's title and/or a bookmark's URL, by id.",
   { id: external_exports.string(), title: external_exports.string().optional(), url: external_exports.string().optional() },
   async ({ id, title, url }) => {
+    rejectEmptyProvidedTitle(title, "empty title");
     if (WRITES_OFF) return reportOnly("update_bookmark", { id, title, url });
     const out = {};
     if (title != null) out.renamed = await bridge.call("rename", { id, title });
@@ -25120,8 +25232,9 @@ server.tool(
   "Export the whole bookmark tree as portable JSON. If file_path is given, write it server-side and return the path; otherwise return the JSON.",
   { file_path: external_exports.string().optional() },
   async ({ file_path }) => {
+    rejectEmptyFilePath(file_path);
     const data = await bridge.call("export", {});
-    if (file_path) {
+    if (file_path != null) {
       try {
         await (0, import_promises.writeFile)(file_path, JSON.stringify(data, null, 2));
       } catch (e) {
@@ -25134,9 +25247,10 @@ server.tool(
 );
 server.tool(
   "import_json",
-  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id.",
+  "Import a previously exported bookmark JSON file (see export_json) under a target folder. Recreates the tree; it does NOT deduplicate, so importing into a folder that already has the same bookmarks will create copies. Target via into_path (created if missing, default 'Other bookmarks') or into_parent_id. An into_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { file_path: external_exports.string(), into_path: external_exports.string().optional(), into_parent_id: external_exports.string().optional() },
   async ({ file_path, into_path, into_parent_id }) => {
+    rejectEmptyFilePath(file_path);
     let data;
     try {
       data = JSON.parse(await (0, import_promises.readFile)(file_path, "utf8"));
@@ -25152,11 +25266,12 @@ server.tool(
 );
 server.tool(
   "apply_moves",
-  "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'.",
+  "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'. Each proposed folder path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks' (except the literal 'DELETE?' when delete_junk is used).",
   { file_path: external_exports.string().optional(), dry_run: external_exports.boolean().optional(), delete_junk: external_exports.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
     dry_run = dry_run || WRITES_OFF;
-    const path = file_path || PLAN_DEFAULT;
+    rejectEmptyFilePath(file_path);
+    const path = file_path != null ? file_path : PLAN_DEFAULT;
     let raw;
     try {
       raw = await (0, import_promises.readFile)(path, "utf8");
@@ -25185,9 +25300,12 @@ server.tool(
           continue;
         }
         if (!folderId.has(proposed)) {
-          if (dry_run) folderId.set(proposed, "(dry)");
-          else {
-            const f = await bridge.call("ensure_path", { path: proposed.split("/").map((s) => s.trim()).filter(Boolean) });
+          const segments = splitPath(proposed);
+          if (dry_run) {
+            assertPermanentRoot(segments);
+            folderId.set(proposed, "(dry)");
+          } else {
+            const f = await bridge.call("ensure_path", { path: segments });
             folderId.set(proposed, f.id);
           }
         }
@@ -25217,13 +25335,16 @@ server.tool(
     dry_run = dry_run || WRITES_OFF;
     const [root] = await bridge.call("get_tree");
     const removed = [];
+    const gone = /* @__PURE__ */ new Set();
     async function visit(node, isPermanent) {
       for (const ch of (node.children || []).filter((c) => !c.url)) await visit(ch, false);
       if (!isPermanent) {
         const fresh = (await bridge.call("get_tree"))[0];
         const found = findById(fresh, node.id);
-        if (found && (!found.children || found.children.length === 0)) {
+        const remaining = found ? (found.children || []).filter((c) => !gone.has(c.id)) : [];
+        if (found && remaining.length === 0) {
           removed.push({ id: node.id, title: node.title });
+          gone.add(node.id);
           if (!dry_run) await bridge.call("remove", { id: node.id, recursive: true });
         }
       }

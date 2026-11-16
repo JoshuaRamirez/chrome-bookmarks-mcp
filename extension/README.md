@@ -16,6 +16,11 @@ edits to the bookmark file, which the sync engine discards on launch.
 The full manager opens automatically on first load. Re-open it any time from the
 toolbar icon → **Open full manager →**.
 
+After a plugin version bump, that cache path changes. Chrome does not follow
+the old folder. Remove the previous unpacked extension and Load unpacked from
+the new `<version>/extension` directory (or the `extension_dir` from
+`bookmarks_status`).
+
 ## Two surfaces
 
 **Toolbar popup** — quick-add the current tab into any folder (with a clean name).
@@ -34,7 +39,7 @@ toolbar icon → **Open full manager →**.
 | Export JSON | Download the whole tree as portable JSON (your backup) |
 | Import JSON | Recreate an exported tree under any chosen folder |
 
-Permanent roots (Bookmarks bar, Other bookmarks, Mobile) cannot be renamed,
+Permanent roots (Bookmarks bar, Other bookmarks, Mobile bookmarks) cannot be renamed,
 moved, or deleted — only their contents.
 
 ## Architecture
@@ -45,7 +50,11 @@ moved, or deleted — only their contents.
 - `popup.{html,js}` — quick-add current tab.
 - `lib/tabs.js` — `TabStore`: lists open windows, tabs and tab groups, and moves
   tabs between windows and groups without reloading them (used by the MCP bridge).
-- `background.js` — opens the manager on install.
+- `background.js` — MV3 service worker: opens the manager on install, loads
+  `lib/bookmarks.js`, `lib/tabs.js` and `bridge.js` via `importScripts`, and keeps
+  the MCP bridge connection alive (`bridge-keepalive` alarm).
+- `bridge.js` — MCP bridge client. Dials `ws://127.0.0.1:8765` and executes
+  bookmark and tab operations requested by the local MCP server.
 
 ## Permissions
 
@@ -53,5 +62,10 @@ moved, or deleted — only their contents.
 - `tabs` — read the current tab's title/URL for quick-add; list and move open
   tabs for the MCP bridge.
 - `tabGroups` — read, rename and recolour tab groups for the MCP bridge.
+- `alarms` — wake the service worker so it can re-establish the localhost
+  bridge if it dropped.
 
-No network access beyond the localhost bridge (`127.0.0.1`).
+No remote network access. Bookmark data never leaves the machine; the only
+socket is loopback (`ws://127.0.0.1:8765`). The extension declares no host
+permissions and makes no external requests. The tab tools send open tabs'
+titles and addresses over that same loopback socket, to the local MCP server only.

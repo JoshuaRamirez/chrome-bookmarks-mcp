@@ -7,8 +7,8 @@ This plugin has two components that talk over a **localhost-only** WebSocket:
 - **MCP server** (`dist/bundle.cjs`) binds a WebSocket server to
   `127.0.0.1:8765` (configurable via `BOOKMARK_BRIDGE_PORT`). It is not reachable
   from other hosts.
-- **Chrome extension** (`extension/`) requests the `bookmarks` and `tabs`
-  permissions and connects outward to that localhost port.
+- **Chrome extension** (`extension/`) requests the `bookmarks`, `tabs`, and
+  `alarms` permissions and connects outward to that localhost port.
 
 What this means:
 

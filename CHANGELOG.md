@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [Unreleased]
+## [1.2.0]
 
 ### Added
 - Open tabs and tab groups (server 1.2.0, extension 1.1.0): `list_tabs`,
@@ -34,6 +34,186 @@ All notable changes to this project are documented here. Format loosely follows
 ### Fixed
 - The smoke and port-conflict tests take a port the OS says is free, instead of a
   fixed 8791 / 8794 that another local server could hold.
+
+## [1.1.19]
+
+### Fixed
+- `import_json` / `BookmarkStore.importInto` no longer creates a folder whose
+  title trims to empty (`"   "`, tabs). Those titles break path identity:
+  `list_folders` can emit a path that `splitPath` cannot re-target, so
+  `ensure_folder_path` and write tools miss the folder. The folder level is
+  skipped and its children land under the current parent, matching today's
+  empty `""` titles. A title with significant edge spaces (for example
+  `" Dev"`) is still created. Bookmark nodes (a `url` is present) keep their
+  existing title behavior.
+
+## [1.1.18]
+
+### Fixed
+- `create_folder` rejects a provided `name` that trims to empty (`""` or
+  whitespace-only) with `empty folder name` before any bridge call.
+  `update_bookmark` rejects a provided `title` the same way with
+  `empty title`. Those titles poison the path codec: `joinFolderPath` drops
+  `""`, so an empty-titled child under Bookmarks bar collides with the
+  permanent root path, and `splitPath` trims whitespace-only segments away
+  so the folder cannot be re-targeted. Omitting `title` on `update_bookmark`
+  is unchanged. A title with significant edge spaces (for example `" Dev"`)
+  is still forwarded; that case stays with the closed path-codec work.
+
+## [1.1.17]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` rejects a provided `folder_path` whose
+  first segment is neither a permanent-root alias nor a live root title from
+  `getTree()` (alias via `folderType`/id, otherwise a case-insensitive title
+  among `root.children` — the same lookup `ensurePath` uses) with
+  `top-level folder "…" not found; use "Bookmarks bar", "Other bookmarks", or "Mobile bookmarks"`.
+  `Work/Dev`, `Sidebar/Dev`, `Mother/Kids`, and `Automobile/Cars` no longer
+  return a silent empty list. Short aliases still expand to the live root,
+  and a localized title passed literally (for example `Lesezeichenleiste/Dev`)
+  still scopes. Omitting `folder_path` still lists everything. A valid root
+  whose child is missing or empty (`Bookmarks bar/NoSuch`) still returns `[]`.
+- Marketplace upgrades leave Chrome pointed at the previous unpacked
+  extension (`.../<old-version>/extension`), so a new `listBookmarks` never
+  loads. The extension hello now reports the plugin version this package
+  shipped with (`package.json`, currently 1.1.17 — not the separate Chrome
+  `manifest.json` version). When the bridge is connected, `bookmarks_status`
+  includes `server_version` and `extension_version`. If they differ, or an
+  older extension reports no version, the tool returns a warning and steps
+  to open `chrome://extensions`, remove/reload the old unpacked extension,
+  and Load unpacked from the current `extension_dir`, then re-run
+  `bookmarks_status`. See the README upgrade note.
+
+## [1.1.16]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` expands a permanent-root short alias
+  on the first `folder_path` segment (`bar`, `toolbar`, `bookmarks-bar`,
+  `other`, `mobile`, and the full titles) to the live root from `getTree()`
+  (`folderType`, else id — the same lookup `ensurePath` uses). `bar/Dev`
+  scopes that root even when Chrome localizes the title (for example
+  `Lesezeichenleiste` instead of `Bookmarks bar`). Later segments stay
+  literal titles. Substring lookalikes (`Sidebar`, `Mother`, `Automobile`)
+  stay unmatched. Omitting `folder_path` still lists everything.
+
+## [1.1.15]
+
+### Fixed
+- `ensure_folder_path` and `list_bookmarks` now reject a provided empty or
+  whitespace-only folder path (`""`, `/`) with `empty path` before any bridge
+  call, matching `resolveFolder`, `ensurePath`, and `listBookmarks`. A
+  disconnected bridge no longer turns that input into a not-connected error.
+  Omitting `folder_path` on `list_bookmarks` still lists everything.
+
+## [1.1.14]
+
+### Fixed
+- `import_json` now rejects a provided empty or whitespace-only `file_path`
+  (`""`) with `empty file path`, matching `apply_moves` and `export_json`.
+  A blank path no longer falls through to `readFile` and a confusing ENOENT.
+
+## [1.1.13]
+
+### Fixed
+- `apply_moves` and `export_json` now reject a provided empty or whitespace-only
+  `file_path` (`""`) with `empty file path`. Omitting `file_path` still reads
+  the apply_moves default plan (`BOOKMARK_PLAN_FILE`, or
+  `~/.chrome-bookmarks-mcp/proposed-moves.tsv`) and still returns export JSON
+  in-band.
+
+## [1.1.12]
+
+### Fixed
+- Write-path tools that go through `resolveFolder` (`add_bookmark`,
+  `create_folder`, `move_bookmark`, `import_json`) now reject a provided empty
+  or whitespace-only folder id (`parent_id` / `to_parent_id` / `into_parent_id`
+  `""`) with `empty parent id`. Omitting the id still uses the tool default
+  (`Bookmarks bar`, or `Other bookmarks` for import). `move_bookmark` with an
+  empty `to_parent_id` no longer falls through to the omit-both message;
+  omitting both destination arguments still asks for `to_path` or
+  `to_parent_id`.
+
+## [1.1.11]
+
+### Fixed
+- Folder paths now round-trip when a title contains `/` or `\` (e.g. `CI/CD`).
+  `list_folders`, `list_bookmarks`, `search_bookmarks`, and `find_duplicates`
+  escape those characters inside each segment; `splitPath` / `ensure_folder_path`
+  / `resolveFolder` / `apply_moves` unescape so the path resolves to that folder
+  instead of creating nested `CI` → `CD`. `list_bookmarks` matches on real title
+  segments, so `Bookmarks bar/CI` no longer includes bookmarks under `CI/CD`.
+
+## [1.1.10]
+
+### Fixed
+- Write-path tools that go through `resolveFolder` (`add_bookmark`,
+  `create_folder`, `move_bookmark`, `import_json`) now reject a provided empty
+  folder path (`""`) with `empty path`, matching `ensurePath` and
+  `list_bookmarks`. Omitting the path still uses the tool default (`Bookmarks
+  bar`, or `Other bookmarks` for import). `move_bookmark` with both destination
+  arguments omitted still asks for `to_path` or `to_parent_id`.
+
+## [1.1.9]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` now rejects a provided `folder_path` that
+  normalizes to empty (`/`, `///`, whitespace-only) with `empty path`, matching
+  `ensurePath` and `apply_moves`. Omitting `folder_path` still lists everything.
+
+## [1.1.8]
+
+### Fixed
+- `list_bookmarks` / `listBookmarks` now matches `folder_path` case-insensitively
+  (trim + lowercase + rejoin), so `bookmarks bar/dev` and USAGE `Other Bookmarks`
+  return the same hits as Chrome's real titles. Emitted `folder` strings keep
+  Chrome's casing. No short-alias expansion (`bar` / `other` / `mobile`).
+
+## [1.1.7]
+
+### Fixed
+- `search_bookmarks` / `searchWithPaths` no longer returns folder nodes (no
+  `url`) from `chrome.bookmarks.search`. Hits stay title/URL bookmarks with
+  folder path — the same filter `listBookmarks`, `findDuplicates`, and the
+  manager UI already apply.
+
+## [1.1.6]
+
+### Fixed
+- Permanent-root detection no longer substring-matches `bar` / `other` /
+  `mobile`. `Sidebar/Dev`, `Mother/Kids`, and `Automobile/Cars` are rejected
+  the same way as `Work/…` (`top-level folder "…" not found`). Short aliases
+  (`bar`, `toolbar`, `other`, `mobile`) and the full root names still work.
+  `apply_moves` dry_run and live `ensurePath` stay on the same allowlist
+  (`Map`, so `constructor` / `toString` / `__proto__` are not aliases).
+
+## [1.1.5]
+
+### Fixed
+- `remove_empty_folders` dry_run now reports the same cascade live apply would
+  delete: after an empty child is listed, its parent is treated as empty too
+  (instead of trusting a fresh `get_tree` that still contains those children).
+  dry_run still does not call `remove`. Permanent roots stay skipped; folders
+  that contain bookmarks (or non-empty folders) are not listed.
+
+## [1.1.4]
+
+### Fixed
+- `apply_moves` dry_run now rejects proposed destinations whose top level is not
+  a permanent root (`Bookmarks bar` / `Other bookmarks` / `Mobile bookmarks`,
+  including the same bar/toolbar, other, mobile aliases as `ensurePath`) or
+  whose path is empty. Those rows are reported in `errors` and no longer
+  increment `moved`. Dry_run stays browser-free and does not create folders;
+  `DELETE?` skip / `delete_junk` is unchanged.
+
+## [1.1.3]
+
+### Changed
+- Tool descriptions for `import_json` and `apply_moves` now state that a folder
+  path's top level must be a permanent root (`Bookmarks bar`, `Other bookmarks`,
+  or `Mobile bookmarks`) — the same rule `add_bookmark`, `create_folder`,
+  `move_bookmark`, and `ensure_folder_path` already named. `apply_moves` notes
+  the exception for the literal `DELETE?` when `delete_junk` is used. Helps the
+  driving model target folders correctly on the first try.
 
 ## [1.1.2]
 

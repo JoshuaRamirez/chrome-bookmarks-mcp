@@ -24,15 +24,18 @@
     "src",
     "extension",
     "tools",
+    "examples",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md"
   ],
   "scripts": {
     "build": "esbuild src/server.js --bundle --platform=node --format=cjs --target=node18 --outfile=dist/bundle.cjs --external:bufferutil --external:utf-8-validate",
     "start": "node dist/bundle.cjs",
     "probe": "node src/probe.mjs",
     "call": "node src/call.mjs",
-    "test": "node test/smoke.mjs && node test/port-conflict.mjs && node test/bookmarkstore.mjs && node test/tabstore.mjs && node test/apply-moves.mjs && node test/writes-off.mjs && node test/shared-sessions.mjs"
+    "test": "node test/smoke.mjs && node test/port-conflict.mjs && node test/bookmarkstore.mjs && node test/tabstore.mjs && node test/apply-moves.mjs && node test/remove-empty-folders.mjs && node test/resolve-folder.mjs && node test/file-path.mjs && node test/empty-folder-path.mjs && node test/empty-title.mjs && node test/extension-version.mjs && node test/writes-off.mjs && node test/shared-sessions.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

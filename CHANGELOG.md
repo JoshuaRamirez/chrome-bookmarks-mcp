@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- Open tabs and tab groups (server 1.2.0, extension 1.1.0): `list_tabs`,
+  `list_tab_groups`, `group_tabs`, `ungroup_tabs`, `move_tabs`,
+  `update_tab_group`, `move_tab_group`. Moves are real moves through
+  `chrome.tabs` / `chrome.tabGroups`, so a tab keeps its page and history. The
+  extension gains the `tabGroups` permission and `lib/tabs.js` (`TabStore`).
+  Test: `test/tabstore.mjs`. No tool closes a tab.
+- `reload_extension` reloads the companion extension from disk, so later
+  extension edits need no click at `chrome://extensions`.
 - `BOOKMARK_WRITES=off` makes the server report-only: tools with `dry_run` always
   preview, and `ensure_folder_path`, `add_bookmark`, `create_folder`,
   `update_bookmark`, `move_bookmark`, `remove_bookmark` and `import_json` answer

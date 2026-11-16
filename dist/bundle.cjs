@@ -24923,7 +24923,22 @@ var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
 var WRITES_OFF = /^off$/i.test(process.env.BOOKMARK_WRITES || "");
-var WRITE_OPS = /* @__PURE__ */ new Set(["ensure_path", "create_bookmark", "create_folder", "rename", "set_url", "move", "remove", "import"]);
+var WRITE_OPS = /* @__PURE__ */ new Set([
+  "ensure_path",
+  "create_bookmark",
+  "create_folder",
+  "rename",
+  "set_url",
+  "move",
+  "remove",
+  "import",
+  "group_tabs",
+  "ungroup_tabs",
+  "move_tabs",
+  "update_tab_group",
+  "move_tab_group",
+  "reload_extension"
+]);
 var bridgeCall = bridge.call.bind(bridge);
 bridge.call = (op, params) => {
   if (WRITES_OFF && WRITE_OPS.has(op)) {
@@ -24932,7 +24947,7 @@ bridge.call = (op, params) => {
   return bridgeCall(op, params);
 };
 var reportOnly = (tool, args) => ok({ writes: "off", tool, would: args, note: "BOOKMARK_WRITES=off: nothing was changed in Chrome." });
-var server = new McpServer({ name: "chrome-bookmarks", version: "1.1.2" });
+var server = new McpServer({ name: "chrome-bookmarks", version: "1.2.0" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
 });
@@ -25224,6 +25239,65 @@ server.tool(
     for (const perm of root.children || []) await visit(perm, true);
     return ok({ dry_run: !!dry_run, removed_count: removed.length, removed });
   }
+);
+var TAB_COLORS = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+var tabIdsArg = external_exports.array(external_exports.number().int()).min(1).describe("tab ids from list_tabs");
+server.tool(
+  "list_tabs",
+  "List open Chrome windows with their tab groups and tabs in tab-strip order. Each tab has {id, index, title, url, active, pinned, groupId}; groupId is null for a tab in no group. Optionally narrow to one window.",
+  { window_id: external_exports.number().int().optional().describe("only this window") },
+  async ({ window_id }) => ok(await bridge.call("list_tabs", { windowId: window_id }))
+);
+server.tool(
+  "list_tab_groups",
+  "List tab groups as {id, windowId, title, color, collapsed, tabCount}. Optionally narrow to one window.",
+  { window_id: external_exports.number().int().optional() },
+  async ({ window_id }) => ok(await bridge.call("list_tab_groups", { windowId: window_id }))
+);
+server.tool(
+  "group_tabs",
+  "Put tabs into a tab group; they land at the end of the group in the order given, and stay loaded. Target by group_id, or by group_title: the one existing group with that title is joined (case-insensitive; narrowed to window_id when given), otherwise a new group with that title is made. With neither, a new untitled group is made. Tabs from another window are moved across.",
+  {
+    tab_ids: tabIdsArg,
+    group_id: external_exports.number().int().optional(),
+    group_title: external_exports.string().optional(),
+    window_id: external_exports.number().int().optional().describe("window to look for the titled group in, or to make a new group in"),
+    color: external_exports.enum(TAB_COLORS).optional()
+  },
+  async ({ tab_ids, group_id, group_title, window_id, color }) => {
+    if (WRITES_OFF) return reportOnly("group_tabs", { tab_ids, group_id, group_title, window_id, color });
+    return ok(await bridge.call("group_tabs", { tabIds: tab_ids, groupId: group_id, groupTitle: group_title, windowId: window_id, color }));
+  }
+);
+server.tool(
+  "ungroup_tabs",
+  "Take tabs out of their tab group. The tabs stay open where they are.",
+  { tab_ids: tabIdsArg },
+  async ({ tab_ids }) => WRITES_OFF ? reportOnly("ungroup_tabs", { tab_ids }) : ok(await bridge.call("ungroup_tabs", { tabIds: tab_ids }))
+);
+server.tool(
+  "move_tabs",
+  "Move tabs to a position in a window without reloading them. index is the tab-strip position (omit or -1 for the end); window_id omitted keeps each tab in its own window. A tab moved to another window leaves its group; use group_tabs to move a tab straight into a group.",
+  { tab_ids: tabIdsArg, window_id: external_exports.number().int().optional(), index: external_exports.number().int().optional() },
+  async ({ tab_ids, window_id, index }) => WRITES_OFF ? reportOnly("move_tabs", { tab_ids, window_id, index }) : ok(await bridge.call("move_tabs", { tabIds: tab_ids, windowId: window_id, index }))
+);
+server.tool(
+  "update_tab_group",
+  "Rename, recolour, collapse or expand a tab group.",
+  { group_id: external_exports.number().int(), title: external_exports.string().optional(), color: external_exports.enum(TAB_COLORS).optional(), collapsed: external_exports.boolean().optional() },
+  async ({ group_id, title, color, collapsed }) => WRITES_OFF ? reportOnly("update_tab_group", { group_id, title, color, collapsed }) : ok(await bridge.call("update_tab_group", { groupId: group_id, title, color, collapsed }))
+);
+server.tool(
+  "move_tab_group",
+  "Move a whole tab group, with its tabs, to a position in its window or to another window. index omitted or -1 is the end.",
+  { group_id: external_exports.number().int(), window_id: external_exports.number().int().optional(), index: external_exports.number().int().optional() },
+  async ({ group_id, window_id, index }) => WRITES_OFF ? reportOnly("move_tab_group", { group_id, window_id, index }) : ok(await bridge.call("move_tab_group", { groupId: group_id, windowId: window_id, index }))
+);
+server.tool(
+  "reload_extension",
+  "Reload the companion Chrome extension from its folder on disk, so edited extension files take effect without a click at chrome://extensions. The bridge drops and reconnects within a few seconds.",
+  {},
+  async () => WRITES_OFF ? reportOnly("reload_extension", {}) : ok(await bridge.call("reload_extension"))
 );
 (async () => {
   const transport = new StdioServerTransport();

@@ -27,6 +27,8 @@ const EXPECTED_TOOLS = [
   "stats", "ensure_folder_path", "add_bookmark", "create_folder",
   "update_bookmark", "move_bookmark", "remove_bookmark", "find_duplicates",
   "remove_duplicates", "export_json", "import_json", "apply_moves", "remove_empty_folders",
+  "list_tabs", "list_tab_groups", "group_tabs", "ungroup_tabs", "move_tabs",
+  "update_tab_group", "move_tab_group", "reload_extension",
 ];
 
 const REQUESTS = [

@@ -43,11 +43,15 @@ moved, or deleted — only their contents.
   (traversal, folder enumeration, dedupe, export/import). Shared by all pages.
 - `manager.{html,css,js}` — the management UI (safe DOM construction, no innerHTML).
 - `popup.{html,js}` — quick-add current tab.
+- `lib/tabs.js` — `TabStore`: lists open windows, tabs and tab groups, and moves
+  tabs between windows and groups without reloading them (used by the MCP bridge).
 - `background.js` — opens the manager on install.
 
 ## Permissions
 
 - `bookmarks` — read/write bookmarks.
-- `tabs` — read the current tab's title/URL for quick-add.
+- `tabs` — read the current tab's title/URL for quick-add; list and move open
+  tabs for the MCP bridge.
+- `tabGroups` — read, rename and recolour tab groups for the MCP bridge.
 
-No network access, no data leaves the browser.
+No network access beyond the localhost bridge (`127.0.0.1`).

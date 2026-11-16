@@ -24,6 +24,12 @@ const WRITES = [
   ["update_bookmark", { id: "1", title: "t" }],
   ["move_bookmark", { id: "1", to_parent_id: "2" }],
   ["remove_bookmark", { id: "1", recursive: true }],
+  ["group_tabs", { tab_ids: [1], group_title: "T" }],
+  ["ungroup_tabs", { tab_ids: [1] }],
+  ["move_tabs", { tab_ids: [1], index: 0 }],
+  ["update_tab_group", { group_id: 1, title: "T" }],
+  ["move_tab_group", { group_id: 1 }],
+  ["reload_extension", {}],
 ];
 
 function fail(msg) { console.error(`✗ ${msg}`); process.exitCode = 1; }

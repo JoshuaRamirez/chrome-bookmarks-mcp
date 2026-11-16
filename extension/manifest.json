@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Manager Utility",
-  "version": "1.0.5",
-  "description": "Full bookmark management — create, rename, move, delete folders & bookmarks with folder targeting; quick-add the current tab; find/remove duplicates; export/import. All changes go through chrome.bookmarks, so they sync.",
-  "permissions": ["bookmarks", "tabs", "alarms"],
+  "version": "1.1.0",
+  "description": "Full bookmark management — create, rename, move, delete folders & bookmarks with folder targeting; quick-add the current tab; find/remove duplicates; export/import. All changes go through chrome.bookmarks, so they sync. Also lists and arranges open tabs and tab groups for the local MCP bridge.",
+  "permissions": ["bookmarks", "tabs", "tabGroups", "alarms"],
   "background": { "service_worker": "background.js" },
   "icons": {
     "16": "icons/icon-16.png",

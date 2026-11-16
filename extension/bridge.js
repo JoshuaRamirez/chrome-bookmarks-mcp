@@ -1,6 +1,6 @@
 // Extension bridge: dials the local MCP server's WebSocket and executes
-// bookmark operations on request. Runs in the service worker; uses the shared
-// BookmarkStore (lib/bookmarks.js, imported first by background.js).
+// bookmark and tab operations on request. Runs in the service worker; uses the
+// shared BookmarkStore and TabStore (lib/, imported first by background.js).
 
 const BRIDGE_URL = "ws://127.0.0.1:8765";
 let _ws = null;
@@ -49,6 +49,19 @@ async function bridgeDispatch(method, p) {
     case "export":          return BookmarkStore.exportTree(p.rootId);
     case "import":          return BookmarkStore.importInto(p.parentId, p.data);
     case "ensure_path":     return ensurePath(p.path || []);
+    case "list_tabs":       return TabStore.listWindows(p.windowId);
+    case "list_tab_groups": return TabStore.listGroups(p.windowId);
+    case "group_tabs":      return TabStore.groupTabs(p);
+    case "ungroup_tabs":    return TabStore.ungroupTabs(p.tabIds);
+    case "move_tabs":       return TabStore.moveTabs(p);
+    case "update_tab_group":return TabStore.updateGroup(p);
+    case "move_tab_group":  return TabStore.moveGroup(p);
+    case "version":         return { version: chrome.runtime.getManifest().version };
+    // Reload this extension from disk (picks up edited files and a changed
+    // manifest). Answers first; the socket drops and redials after the reload.
+    case "reload_extension":
+      setTimeout(() => chrome.runtime.reload(), 250);
+      return { reloading: true, from_version: chrome.runtime.getManifest().version };
     default: throw new Error("unknown method: " + method);
   }
 }

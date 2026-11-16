@@ -1,7 +1,7 @@
 // Service worker. Loads the shared store and the MCP bridge, opens the manager
 // on first install, and keeps the bridge connection alive across SW restarts.
 
-importScripts("lib/bookmarks.js", "bridge.js");
+importScripts("lib/bookmarks.js", "lib/tabs.js", "bridge.js");
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {

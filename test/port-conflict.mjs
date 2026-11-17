@@ -8,14 +8,20 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { createServer } from "node:net";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE = join(__dirname, "..", "dist", "bundle.cjs");
-const PORT = "8794"; // dedicated to this test
+// A port the OS says is free right now; the blocker below then takes it.
+const PORT = await new Promise((res, rej) => {
+  const probe = createServer();
+  probe.once("error", rej);
+  probe.listen(0, "127.0.0.1", () => { const { port } = probe.address(); probe.close(() => res(String(port))); });
+});
 
 function spawnServer() {
   return spawn("node", [BUNDLE], {
-    env: { ...process.env, BOOKMARK_BRIDGE_PORT: PORT },
+    env: { ...process.env, BOOKMARK_BRIDGE_PORT: PORT, BOOKMARK_BRIDGE_RETRY_MS: "300" },
     stdio: ["pipe", "pipe", "ignore"],
   });
 }
@@ -54,6 +60,20 @@ if (status && status.connected === false && status.listening === false && /EADDR
   console.log("✓ port-conflict — bookmarks_status reports EADDRINUSE instead of a misleading 'not connected'");
 } else {
   console.error(`✗ port-conflict — expected an EADDRINUSE diagnostic, got: ${text.slice(0, 160)}`);
+  exitCode = 1;
+}
+
+// The blocker exits: the server under test keeps retrying and takes the port.
+try { blocker.kill("SIGTERM"); } catch { /* gone */ }
+await delay(1500);
+server.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "bookmarks_status", arguments: {} } }) + "\n");
+await delay(800);
+let after;
+try { after = JSON.parse(responses.get(4)?.result?.content?.[0]?.text || ""); } catch { after = null; }
+if (after && after.listening === true && !/EADDRINUSE/.test(after.message || "")) {
+  console.log("✓ port-conflict — once the holder exits, the waiting copy takes the port");
+} else {
+  console.error(`✗ port-conflict — expected the port taken over after the holder exited, got: ${JSON.stringify(after).slice(0, 160)}`);
   exitCode = 1;
 }
 

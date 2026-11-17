@@ -6,7 +6,7 @@ of non-obvious rules worth knowing before you open a PR.
 ## Repository layout
 
 ```
-src/            MCP server sources (server.js, bridge.js, probe.mjs)
+src/            MCP server sources (server.js, bridge.js, probe.mjs, call.mjs)
 dist/bundle.cjs Pre-bundled, committed server artifact (esbuild → CommonJS)
 extension/      Chrome extension (MV3) — the browser half of the bridge
 test/           Node smoke + robustness tests (no browser needed)
@@ -27,8 +27,9 @@ npm run build      # esbuild src/server.js → dist/bundle.cjs
 npm test           # four Node suites: protocol, diagnostics, BookmarkStore, apply_moves
 ```
 
-`npm test` runs four suites, none of which need Chrome:
-- `test/smoke.mjs` — handshake, all 17 tools present, disconnected-state guidance.
+`npm test` runs these suites among others, none of which need Chrome:
+- `test/smoke.mjs` — handshake, every tool present, disconnected-state guidance.
+- `test/tabstore.mjs` — the tab and tab-group logic against a mock tab strip.
 - `test/port-conflict.mjs` — a second server on a taken port reports EADDRINUSE.
 - `test/bookmarkstore.mjs` — BookmarkStore against a mock `chrome.bookmarks` tree.
 - `test/apply-moves.mjs` — missing-plan-file message, a dry-run over `examples/sample-plan.tsv`, and a dry-run over a temp TSV with an invalid destination.
@@ -52,7 +53,8 @@ existing UI builds nodes explicitly.
 
 1. Add the `server.tool(...)` registration in `src/server.js`.
 2. Add the matching `case` in `extension/bridge.js` `bridgeDispatch`, backed by a
-   method on `BookmarkStore` (`extension/lib/bookmarks.js`) where appropriate.
+   method on `BookmarkStore` (`extension/lib/bookmarks.js`) or `TabStore`
+   (`extension/lib/tabs.js`) where appropriate.
 3. Add its name to `EXPECTED_TOOLS` in `test/smoke.mjs`.
 4. `npm run build && npm test`, commit the bundle.
 

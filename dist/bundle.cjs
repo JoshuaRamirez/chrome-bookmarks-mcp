@@ -24798,8 +24798,9 @@ var import_websocket_server = __toESM(require_websocket_server(), 1);
 
 // src/bridge.js
 var Bridge = class {
-  constructor(port = 8765, log = (...a) => console.error(...a)) {
+  constructor(port = 8765, log = (...a) => console.error(...a), retryMs = Number(process.env.BOOKMARK_BRIDGE_RETRY_MS || 2e3)) {
     this.port = port;
+    this.retryMs = retryMs;
     this.log = log;
     this.sock = null;
     this.seq = 1;
@@ -24809,10 +24810,22 @@ var Bridge = class {
     this.extensionVersion = "";
   }
   start() {
+    this._listen();
+    this._ka = setInterval(() => {
+      if (this.connected()) {
+        try {
+          this.sock.send(JSON.stringify({ method: "ping" }));
+        } catch {
+        }
+      }
+    }, 2e4);
+  }
+  _listen() {
     this.wss = new import_websocket_server.default({ host: "127.0.0.1", port: this.port });
     this.wss.on("listening", () => {
       this.listening = true;
       this.bindError = null;
+      this._retry = null;
       this.log(`[bridge] listening on ws://127.0.0.1:${this.port}`);
     });
     this.wss.on("connection", (ws) => {
@@ -24830,17 +24843,21 @@ var Bridge = class {
       ws.on("error", (e) => this.log("[bridge] socket error:", e.message));
     });
     this.wss.on("error", (e) => {
-      if (!this.listening) this.bindError = { code: e.code || "", message: e.message };
+      if (!this.listening) {
+        this.bindError = { code: e.code || "", message: e.message };
+        if (!this._retry) this.log("[bridge] server error:", e.message, `\u2014 retrying every ${this.retryMs} ms`);
+        clearTimeout(this._retry);
+        this._retry = setTimeout(() => {
+          try {
+            this.wss.close();
+          } catch {
+          }
+          this._listen();
+        }, this.retryMs);
+        return;
+      }
       this.log("[bridge] server error:", e.message);
     });
-    this._ka = setInterval(() => {
-      if (this.connected()) {
-        try {
-          this.sock.send(JSON.stringify({ method: "ping" }));
-        } catch {
-        }
-      }
-    }, 2e4);
   }
   // Snapshot of the bridge's health for diagnostics.
   status() {
@@ -24954,6 +24971,31 @@ var SERVER_VERSION = (() => {
 var PORT = Number(process.env.BOOKMARK_BRIDGE_PORT || 8765);
 var bridge = new Bridge(PORT);
 bridge.start();
+var WRITES_OFF = /^off$/i.test(process.env.BOOKMARK_WRITES || "");
+var WRITE_OPS = /* @__PURE__ */ new Set([
+  "ensure_path",
+  "create_bookmark",
+  "create_folder",
+  "rename",
+  "set_url",
+  "move",
+  "remove",
+  "import",
+  "group_tabs",
+  "ungroup_tabs",
+  "move_tabs",
+  "update_tab_group",
+  "move_tab_group",
+  "reload_extension"
+]);
+var bridgeCall = bridge.call.bind(bridge);
+bridge.call = (op, params) => {
+  if (WRITES_OFF && WRITE_OPS.has(op)) {
+    return Promise.reject(new Error(`writes are off (BOOKMARK_WRITES=off): '${op}' was not sent to Chrome`));
+  }
+  return bridgeCall(op, params);
+};
+var reportOnly = (tool, args) => ok({ writes: "off", tool, would: args, note: "BOOKMARK_WRITES=off: nothing was changed in Chrome." });
 var server = new McpServer({ name: "chrome-bookmarks", version: SERVER_VERSION || "0.0.0" });
 var ok = (data) => ({
   content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
@@ -25009,6 +25051,7 @@ server.tool(
       const body = {
         connected: true,
         port: s.port,
+        writes: WRITES_OFF ? "off" : "on",
         server_version,
         extension_version,
         message: mismatch ? `Extension bridge connected, but the loaded extension does not match this server (${server_version || "unknown"}). Chrome is still running an older unpacked copy, so bookmark tools may keep the old behavior (including silent empty list_bookmarks results).` : "Extension bridge connected \u2014 all bookmark tools are ready."
@@ -25031,8 +25074,10 @@ server.tool(
         connected: false,
         listening: false,
         port: s.port,
-        message: inUse ? `Could not bind port ${s.port} (EADDRINUSE) \u2014 another process is already using it, most likely a second copy of this server.` : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
+        writes: WRITES_OFF ? "off" : "on",
+        message: inUse ? `Could not bind port ${s.port} (EADDRINUSE) \u2014 another process is already using it, most likely a second copy of this server. Retrying; this copy takes the port when it comes free.` : `The bridge failed to start on port ${s.port}: ${s.bindError.message}`,
         fix: [
+          `Run this server once per machine through shared-mcp (shared_mcp.py connect --name chrome-bookmarks -- node dist/bundle.cjs) so every session shares one copy, or`,
           `Stop the other process using port ${s.port} (e.g. another running chrome-bookmarks server), or`,
           "Set BOOKMARK_BRIDGE_PORT to a free port for this server, and set the matching BRIDGE_URL in extension/bridge.js.",
           "Then restart and re-run bookmarks_status."
@@ -25043,6 +25088,7 @@ server.tool(
       connected: false,
       listening: s.listening,
       port: s.port,
+      writes: WRITES_OFF ? "off" : "on",
       extension_dir: EXTENSION_DIR,
       message: "Extension bridge NOT connected. The server is listening, but the companion Chrome extension hasn't connected yet.",
       fix: [
@@ -25089,6 +25135,7 @@ server.tool(
   async ({ path }) => {
     const segments = splitPath(path);
     if (!segments.length) throw new Error("empty path");
+    if (WRITES_OFF) return reportOnly("ensure_folder_path", { path });
     return ok(await bridge.call("ensure_path", { path: segments }));
   }
 );
@@ -25102,6 +25149,7 @@ server.tool(
     parent_id: external_exports.string().optional()
   },
   async ({ title, url, folder_path, parent_id }) => {
+    if (WRITES_OFF) return reportOnly("add_bookmark", { title, url, folder_path, parent_id });
     const pid = await resolveFolder(parent_id, folder_path);
     return ok(await bridge.call("create_bookmark", { parentId: pid, title, url }));
   }
@@ -25116,6 +25164,7 @@ server.tool(
   },
   async ({ name, parent_path, parent_id }) => {
     rejectEmptyProvidedTitle(name, "empty folder name");
+    if (WRITES_OFF) return reportOnly("create_folder", { name, parent_path, parent_id });
     const pid = await resolveFolder(parent_id, parent_path);
     return ok(await bridge.call("create_folder", { parentId: pid, title: name }));
   }
@@ -25126,6 +25175,7 @@ server.tool(
   { id: external_exports.string(), title: external_exports.string().optional(), url: external_exports.string().optional() },
   async ({ id, title, url }) => {
     rejectEmptyProvidedTitle(title, "empty title");
+    if (WRITES_OFF) return reportOnly("update_bookmark", { id, title, url });
     const out = {};
     if (title != null) out.renamed = await bridge.call("rename", { id, title });
     if (url != null) out.urlSet = await bridge.call("set_url", { id, url });
@@ -25137,6 +25187,7 @@ server.tool(
   "Move a node into a folder by to_path (created if missing) or to_parent_id. A to_path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks'.",
   { id: external_exports.string(), to_path: external_exports.string().optional(), to_parent_id: external_exports.string().optional() },
   async ({ id, to_path, to_parent_id }) => {
+    if (WRITES_OFF) return reportOnly("move_bookmark", { id, to_path, to_parent_id });
     const pid = await resolveFolder(to_parent_id, to_path, null);
     if (!pid) throw new Error("provide to_path or to_parent_id");
     return ok(await bridge.call("move", { id, parentId: pid }));
@@ -25147,6 +25198,7 @@ server.tool(
   "Remove a bookmark by id, or a folder and its contents (set recursive=true for folders).",
   { id: external_exports.string(), recursive: external_exports.boolean().optional() },
   async ({ id, recursive }) => {
+    if (WRITES_OFF) return reportOnly("remove_bookmark", { id, recursive: !!recursive });
     await bridge.call("remove", { id, recursive: !!recursive });
     return ok({ removed: id, recursive: !!recursive });
   }
@@ -25162,6 +25214,7 @@ server.tool(
   "Remove duplicate-URL bookmarks, keeping the first in each group. Use dry_run=true to preview without deleting.",
   { dry_run: external_exports.boolean().optional() },
   async ({ dry_run }) => {
+    dry_run = dry_run || WRITES_OFF;
     const groups = await bridge.call("find_duplicates");
     const removals = [];
     for (const g of groups) for (const n of g.nodes.slice(1)) removals.push({ id: n.id, title: n.title, url: g.url, folder: n.folder });
@@ -25205,6 +25258,7 @@ server.tool(
       if (e.code === "ENOENT") throw new Error(`No file found at ${file_path}. Pass the path to a JSON file produced by export_json.`);
       throw new Error(`Could not read or parse ${file_path}: ${e.message}`);
     }
+    if (WRITES_OFF) return reportOnly("import_json", { file_path, into_path, into_parent_id, top_level_items: Array.isArray(data) ? data.length : 1 });
     const pid = await resolveFolder(into_parent_id, into_path, "Other bookmarks");
     const created = await bridge.call("import", { parentId: pid, data });
     return ok({ imported_into: pid, created });
@@ -25215,6 +25269,7 @@ server.tool(
   "Apply a catalogue plan TSV (columns: id, proposed, current, via, title, url). Creates each target folder and moves the bookmark into it. dry_run=true previews counts without changing anything. delete_junk=true also removes rows whose proposed folder is 'DELETE?'. Each proposed folder path's top level must be 'Bookmarks bar', 'Other bookmarks', or 'Mobile bookmarks' (except the literal 'DELETE?' when delete_junk is used).",
   { file_path: external_exports.string().optional(), dry_run: external_exports.boolean().optional(), delete_junk: external_exports.boolean().optional() },
   async ({ file_path, dry_run, delete_junk }) => {
+    dry_run = dry_run || WRITES_OFF;
     rejectEmptyFilePath(file_path);
     const path = file_path != null ? file_path : PLAN_DEFAULT;
     let raw;
@@ -25277,6 +25332,7 @@ server.tool(
   "Sweep the tree and delete folders that contain no bookmarks (bottom-up), e.g. folders left empty after a re-catalogue. Skips the permanent roots. dry_run=true lists them without deleting.",
   { dry_run: external_exports.boolean().optional() },
   async ({ dry_run }) => {
+    dry_run = dry_run || WRITES_OFF;
     const [root] = await bridge.call("get_tree");
     const removed = [];
     const gone = /* @__PURE__ */ new Set();
@@ -25305,8 +25361,73 @@ server.tool(
     return ok({ dry_run: !!dry_run, removed_count: removed.length, removed });
   }
 );
+var TAB_COLORS = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+var tabIdsArg = external_exports.array(external_exports.number().int()).min(1).describe("tab ids from list_tabs");
+server.tool(
+  "list_tabs",
+  "List open Chrome windows with their tab groups and tabs in tab-strip order. Each tab has {id, index, title, url, active, pinned, groupId}; groupId is null for a tab in no group. Optionally narrow to one window.",
+  { window_id: external_exports.number().int().optional().describe("only this window") },
+  async ({ window_id }) => ok(await bridge.call("list_tabs", { windowId: window_id }))
+);
+server.tool(
+  "list_tab_groups",
+  "List tab groups as {id, windowId, title, color, collapsed, tabCount}. Optionally narrow to one window.",
+  { window_id: external_exports.number().int().optional() },
+  async ({ window_id }) => ok(await bridge.call("list_tab_groups", { windowId: window_id }))
+);
+server.tool(
+  "group_tabs",
+  "Put tabs into a tab group; they land at the end of the group in the order given, and stay loaded. Target by group_id, or by group_title: the one existing group with that title is joined (case-insensitive; narrowed to window_id when given), otherwise a new group with that title is made. With neither, a new untitled group is made. Tabs from another window are moved across.",
+  {
+    tab_ids: tabIdsArg,
+    group_id: external_exports.number().int().optional(),
+    group_title: external_exports.string().optional(),
+    window_id: external_exports.number().int().optional().describe("window to look for the titled group in, or to make a new group in"),
+    color: external_exports.enum(TAB_COLORS).optional()
+  },
+  async ({ tab_ids, group_id, group_title, window_id, color }) => {
+    if (WRITES_OFF) return reportOnly("group_tabs", { tab_ids, group_id, group_title, window_id, color });
+    return ok(await bridge.call("group_tabs", { tabIds: tab_ids, groupId: group_id, groupTitle: group_title, windowId: window_id, color }));
+  }
+);
+server.tool(
+  "ungroup_tabs",
+  "Take tabs out of their tab group. The tabs stay open where they are.",
+  { tab_ids: tabIdsArg },
+  async ({ tab_ids }) => WRITES_OFF ? reportOnly("ungroup_tabs", { tab_ids }) : ok(await bridge.call("ungroup_tabs", { tabIds: tab_ids }))
+);
+server.tool(
+  "move_tabs",
+  "Move tabs to a position in a window without reloading them. index is the tab-strip position (omit or -1 for the end); window_id omitted keeps each tab in its own window. A tab moved to another window leaves its group; use group_tabs to move a tab straight into a group.",
+  { tab_ids: tabIdsArg, window_id: external_exports.number().int().optional(), index: external_exports.number().int().optional() },
+  async ({ tab_ids, window_id, index }) => WRITES_OFF ? reportOnly("move_tabs", { tab_ids, window_id, index }) : ok(await bridge.call("move_tabs", { tabIds: tab_ids, windowId: window_id, index }))
+);
+server.tool(
+  "update_tab_group",
+  "Rename, recolour, collapse or expand a tab group.",
+  { group_id: external_exports.number().int(), title: external_exports.string().optional(), color: external_exports.enum(TAB_COLORS).optional(), collapsed: external_exports.boolean().optional() },
+  async ({ group_id, title, color, collapsed }) => WRITES_OFF ? reportOnly("update_tab_group", { group_id, title, color, collapsed }) : ok(await bridge.call("update_tab_group", { groupId: group_id, title, color, collapsed }))
+);
+server.tool(
+  "move_tab_group",
+  "Move a whole tab group, with its tabs, to a position in its window or to another window. index omitted or -1 is the end.",
+  { group_id: external_exports.number().int(), window_id: external_exports.number().int().optional(), index: external_exports.number().int().optional() },
+  async ({ group_id, window_id, index }) => WRITES_OFF ? reportOnly("move_tab_group", { group_id, window_id, index }) : ok(await bridge.call("move_tab_group", { groupId: group_id, windowId: window_id, index }))
+);
+server.tool(
+  "reload_extension",
+  "Reload the companion Chrome extension from its folder on disk, so edited extension files take effect without a click at chrome://extensions. The bridge drops and reconnects within a few seconds.",
+  {},
+  async () => WRITES_OFF ? reportOnly("reload_extension", {}) : ok(await bridge.call("reload_extension"))
+);
 (async () => {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp] chrome-bookmarks server ready (stdio)");
+  const quit = () => {
+    console.error("[mcp] stdin closed; exiting");
+    process.exit(0);
+  };
+  process.stdin.on("end", quit);
+  process.stdin.on("close", quit);
 })();

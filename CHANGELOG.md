@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow SemVer.
 
-## [1.1.20]
+## [1.2.1]
 
 ### Fixed
 - Permanent-root lookup prefers the syncing root when Chrome 134+ returns two
@@ -17,6 +17,38 @@ All notable changes to this project are documented here. Format loosely follows
   root and a syncing root that share a title (both `Bookmarks bar`) do not
   both match. A non-alias title still matches by title. A single root with
   no `syncing` field still matches as before.
+
+## [1.2.0]
+
+### Added
+- Open tabs and tab groups (server 1.2.0, extension 1.1.0): `list_tabs`,
+  `list_tab_groups`, `group_tabs`, `ungroup_tabs`, `move_tabs`,
+  `update_tab_group`, `move_tab_group`. Moves are real moves through
+  `chrome.tabs` / `chrome.tabGroups`, so a tab keeps its page and history. The
+  extension gains the `tabGroups` permission and `lib/tabs.js` (`TabStore`).
+  Test: `test/tabstore.mjs`. No tool closes a tab.
+- `reload_extension` reloads the companion extension from disk, so later
+  extension edits need no click at `chrome://extensions`.
+- `BOOKMARK_WRITES=off` makes the server report-only: tools with `dry_run` always
+  preview, and `ensure_folder_path`, `add_bookmark`, `create_folder`,
+  `update_bookmark`, `move_bookmark`, `remove_bookmark` and `import_json` answer
+  with what they would do and send nothing to Chrome. `bookmarks_status` reports
+  `writes: on|off`. Test: `test/writes-off.mjs`.
+- One copy per machine through shared-mcp: the README's registration runs the
+  server once behind a shared-mcp gateway, so every session shares one bridge
+  instead of all but the first failing on 8765. Test: `test/shared-sessions.mjs`
+  (two sessions read at once, writes off, no copy left on the port after stop).
+
+### Changed
+- A copy that can't bind the bridge port keeps retrying
+  (`BOOKMARK_BRIDGE_RETRY_MS`, default 2000) and takes the port when the holder
+  exits; `test/port-conflict.mjs` covers the take-over.
+- The server exits when its stdin closes, so an orphaned copy never keeps the
+  port or the extension's socket.
+
+### Fixed
+- The smoke and port-conflict tests take a port the OS says is free, instead of a
+  fixed 8791 / 8794 that another local server could hold.
 
 ## [1.1.19]
 

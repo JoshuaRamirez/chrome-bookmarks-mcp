@@ -22,9 +22,10 @@ Claude Code ──stdio──▶ MCP server ──ws://127.0.0.1:8765──▶ C
 ```
 
 - **MCP server** (`dist/bundle.cjs`) — a stdio MCP server exposing 17 bookmark
-  tools. It starts a localhost WebSocket bridge on port `8765`.
+  tools and 8 tab tools. It starts a localhost WebSocket bridge on port `8765`.
 - **Chrome extension** (`extension/`) — dials into that bridge and runs each
-  operation inside the browser's `chrome.bookmarks` context.
+  operation inside the browser's `chrome.bookmarks` context (and `chrome.tabs` /
+  `chrome.tabGroups` for the tab tools).
 
 The MCP server can only act while Chrome is open with the extension loaded; the
 `bookmarks_status` tool reports whether the bridge is connected.
@@ -47,6 +48,25 @@ From the RedJay marketplace:
 
 The server is pre-bundled (`dist/bundle.cjs`) — no `npm install` needed at
 plugin-load time.
+
+### Many sessions on one machine: run it once, through shared-mcp
+
+The bridge port (8765) can be held by one process only, and every Claude Code
+session starts its own copy of an MCP server. Register the server through
+[shared-mcp](https://github.com/JoshuaRamirez/shared-mcp) so one long-lived
+copy owns the port and the extension's socket, and each session is a thin
+client of it:
+
+```
+claude mcp add chrome-bookmarks -s user -e BOOKMARK_WRITES=off -- \
+  python3 ~/Developer/shared-mcp/shared_mcp.py connect --name chrome-bookmarks \
+  --env BOOKMARK_WRITES -- "$(command -v node)" /abs/path/to/dist/bundle.cjs
+```
+
+A copy that can't bind the port keeps retrying (every `BOOKMARK_BRIDGE_RETRY_MS`,
+default 2000) and takes it when the holder exits, and a copy exits when its
+stdin closes, so an orphaned copy never keeps the port. Test:
+`test/shared-sessions.mjs` (two sessions reading at once).
 
 ### 2. The Chrome extension (one time)
 
@@ -95,6 +115,24 @@ from that new folder, then re-run `bookmarks_status` and confirm
 | `apply_moves` | Batch-move bookmarks from a plan TSV (supports `dry_run`) |
 | `export_json` | Export the whole tree as portable JSON |
 | `import_json` | Recreate an exported JSON tree under a target folder (backup restore) |
+
+### Open tabs and tab groups
+
+These act on the live tab strip. A tab that is moved or grouped stays loaded:
+nothing is closed or reopened, so its page, history and scroll position survive.
+
+| Tool | Purpose |
+|------|---------|
+| `list_tabs` | Open windows with their tab groups and tabs, in tab-strip order |
+| `list_tab_groups` | Tab groups with id, window, title, colour and tab count |
+| `group_tabs` | Put tabs into a group by id or title (joins the group with that title, else makes it); works across windows |
+| `ungroup_tabs` | Take tabs out of their group |
+| `move_tabs` | Move tabs to a position in the same or another window |
+| `update_tab_group` | Rename, recolour, collapse or expand a group |
+| `move_tab_group` | Move a whole group, with its tabs, within or between windows |
+| `reload_extension` | Reload the companion extension from disk after its files change |
+
+No tab tool closes a tab. `BOOKMARK_WRITES=off` makes these report-only too.
 
 See **[examples/USAGE.md](examples/USAGE.md)** for a step-by-step walkthrough —
 first-run check, adding to a folder, safe deduplication, and batch reorganization.
@@ -145,7 +183,9 @@ is committed, so any `src/` change must be rebuilt and committed (CI enforces th
 ## Privacy
 
 No network access beyond the localhost bridge. Bookmarks never leave your
-machine; the extension talks only to `127.0.0.1`.
+machine; the extension talks only to `127.0.0.1`. The tab tools send the titles
+and addresses of your open tabs over that same localhost bridge, to the MCP
+client that asked, and nowhere else.
 
 ## License
 
